@@ -14,9 +14,8 @@
 #include "esp_netif.h"
 #include "esp_http_server.h"
 #include "esp_system.h"
-#include "mqtt_client.h"
-#include "cJSON.h"
 #include "wifi_config_html.h"
+#include "mqtt_handler.h"
 
 static const char *TAG = "wifi_manager";
 
@@ -26,11 +25,6 @@ static EventGroupHandle_t s_wifi_event_group;
 
 static int s_retry_num = 0;
 #define MAXIMUM_RETRY  3
-
-// MQTT globals
-static esp_mqtt_client_handle_t mqtt_client = NULL;
-static char g_dev_id[128] = {0};
-static char g_dev_key[128] = {0};
 
 // NVS Helper functions
 esp_err_t save_wifi_credentials(const char* ssid, const char* password) {
@@ -173,197 +167,28 @@ esp_err_t read_dev_credentials(char* dev_id, size_t id_len, char* dev_key, size_
     return ESP_OK;
 }
 
-// ==================== MQTT CLIENT ====================
-static const char *MQTT_TAG = "mqtt_qms";
-
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
-{
-    esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
-    esp_mqtt_client_handle_t client = event->client;
-
-    switch ((esp_mqtt_event_id_t)event_id) {
-    case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(MQTT_TAG, "============================================");
-        ESP_LOGI(MQTT_TAG, "MQTT CONNECTED to broker!");
-        ESP_LOGI(MQTT_TAG, "============================================");
-        // Subscribe to display command topic
-        if (strlen(g_dev_id) > 0) {
-            char sub_topic[256];
-            snprintf(sub_topic, sizeof(sub_topic), "qms/display/%s/command", g_dev_id);
-            int msg_id = esp_mqtt_client_subscribe(client, sub_topic, 1);
-            ESP_LOGI(MQTT_TAG, "Subscribing to topic: %s (msg_id=%d)", sub_topic, msg_id);
-        }
-        break;
-
-    case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGW(MQTT_TAG, "MQTT DISCONNECTED from broker. Will auto-reconnect...");
-        break;
-
-    case MQTT_EVENT_SUBSCRIBED:
-        ESP_LOGI(MQTT_TAG, "MQTT SUBSCRIBED, msg_id=%d", event->msg_id);
-        break;
-
-    case MQTT_EVENT_UNSUBSCRIBED:
-        ESP_LOGI(MQTT_TAG, "MQTT UNSUBSCRIBED, msg_id=%d", event->msg_id);
-        break;
-
-    case MQTT_EVENT_PUBLISHED:
-        ESP_LOGD(MQTT_TAG, "MQTT PUBLISHED, msg_id=%d", event->msg_id);
-        break;
-
-    case MQTT_EVENT_DATA:
-        ESP_LOGI(MQTT_TAG, "============================================");
-        ESP_LOGI(MQTT_TAG, "MQTT DATA RECEIVED");
-        ESP_LOGI(MQTT_TAG, "  Topic: %.*s", event->topic_len, event->topic);
-        ESP_LOGI(MQTT_TAG, "  Payload: %.*s", event->data_len, event->data);
-        ESP_LOGI(MQTT_TAG, "============================================");
-
-        // Parse JSON
-        {
-            char *json_buf = (char*)malloc(event->data_len + 1);
-            if (json_buf) {
-                memcpy(json_buf, event->data, event->data_len);
-                json_buf[event->data_len] = '\0';
-
-                cJSON *root = cJSON_Parse(json_buf);
-                if (root) {
-                    cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
-                    if (cmd && cJSON_IsString(cmd)) {
-                        if (strcmp(cmd->valuestring, "display_ticket") == 0) {
-                            cJSON *data = cJSON_GetObjectItem(root, "data");
-                            if (data) {
-                                const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
-                                const char *counter = cJSON_GetStringValue(cJSON_GetObjectItem(data, "counter"));
-                                const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
-                                const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
-                                ESP_LOGI(MQTT_TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                                ESP_LOGI(MQTT_TAG, "  CMD: display_ticket");
-                                ESP_LOGI(MQTT_TAG, "  TICKET : %s", ticket ? ticket : "N/A");
-                                ESP_LOGI(MQTT_TAG, "  COUNTER: %s", counter ? counter : "N/A");
-                                ESP_LOGI(MQTT_TAG, "  SERVICE: %s", service ? service : "N/A");
-                                if (cust_name) {
-                                    ESP_LOGI(MQTT_TAG, "  CUSTOMER: %s", cust_name);
-                                }
-                                ESP_LOGI(MQTT_TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                            }
-                        } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
-                            ESP_LOGI(MQTT_TAG, "  CMD: clear_display - Clearing screen");
-                        } else {
-                            ESP_LOGI(MQTT_TAG, "  Unknown CMD: %s", cmd->valuestring);
-                        }
-                    }
-                    cJSON_Delete(root);
-                } else {
-                    ESP_LOGW(MQTT_TAG, "Failed to parse JSON payload");
-                }
-                free(json_buf);
-            }
-        }
-        break;
-
-    case MQTT_EVENT_ERROR:
-        ESP_LOGE(MQTT_TAG, "MQTT ERROR");
-        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-            ESP_LOGE(MQTT_TAG, "  Transport error: 0x%x", event->error_handle->esp_transport_sock_errno);
-        }
-        break;
-
-    default:
-        ESP_LOGD(MQTT_TAG, "MQTT event id: %d", event->event_id);
-        break;
-    }
-}
-
-// Heartbeat task: publish heartbeat every 20s
-static void mqtt_heartbeat_task(void *pvParameters)
-{
-    char hb_topic[256];
-    snprintf(hb_topic, sizeof(hb_topic), "qms/heartbeat/%s", g_dev_id);
-
-    char hb_payload[256];
-    snprintf(hb_payload, sizeof(hb_payload), "{\"secret_key\":\"%s\"}", g_dev_key);
-
-    ESP_LOGI(MQTT_TAG, "Heartbeat task started. Topic: %s", hb_topic);
-
-    while (1) {
-        if (mqtt_client) {
-            int msg_id = esp_mqtt_client_publish(mqtt_client, hb_topic, hb_payload, 0, 0, 0);
-            ESP_LOGI(MQTT_TAG, "Heartbeat sent (msg_id=%d)", msg_id);
-        }
-        vTaskDelay(pdMS_TO_TICKS(20000)); // 20 seconds
-    }
-}
-
-void clean_broker_host(char* dst, const char* src, size_t dst_len) {
-    const char* start = src;
-    const char* proto_end = strstr(src, "://");
-    if (proto_end) {
-        start = proto_end + 3;
-    }
-    size_t i = 0;
-    while (*start && *start != '/' && *start != ':' && i < dst_len - 1) {
-        dst[i++] = *start++;
-    }
-    dst[i] = '\0';
-}
-
-void mqtt_app_start(const char* broker, int port, const char* user, const char* pass)
-{
-    char clean_host[128] = {0};
-    clean_broker_host(clean_host, broker, sizeof(clean_host));
-
-    ESP_LOGI(MQTT_TAG, "============================================");
-    ESP_LOGI(MQTT_TAG, "Starting MQTT Client");
-    ESP_LOGI(MQTT_TAG, "  Raw Broker  : %s", broker);
-    ESP_LOGI(MQTT_TAG, "  Clean Broker: %s:%d", clean_host, port);
-    ESP_LOGI(MQTT_TAG, "  User        : %s", strlen(user) > 0 ? user : "[none]");
-    ESP_LOGI(MQTT_TAG, "  Dev ID      : %.16s...", g_dev_id);
-    ESP_LOGI(MQTT_TAG, "============================================");
-
-    char uri[256];
-    snprintf(uri, sizeof(uri), "mqtt://%s:%d", clean_host, port);
-
-    esp_mqtt_client_config_t mqtt_cfg = {};
-    mqtt_cfg.broker.address.uri = uri;
-    if (strlen(user) > 0) {
-        mqtt_cfg.credentials.username = user;
-    }
-    if (strlen(pass) > 0) {
-        mqtt_cfg.credentials.authentication.password = pass;
-    }
-    mqtt_cfg.network.reconnect_timeout_ms = 5000;
-
-    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(mqtt_client);
-
-    // Start heartbeat task
-    if (strlen(g_dev_id) > 0 && strlen(g_dev_key) > 0) {
-        xTaskCreate(mqtt_heartbeat_task, "mqtt_hb", 4096, NULL, 5, NULL);
-    } else {
-        ESP_LOGW(MQTT_TAG, "Device ID or KEY not set, heartbeat disabled.");
-    }
-}
-
 // ==================== WIFI EVENT HANDLER ====================
 // Event handler for wifi and IP events
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(TAG, "Connecting to AP...");
+        add_device_log("Connecting to AP...");
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "Retry connection to AP (%d/%d)", s_retry_num, MAXIMUM_RETRY);
+            add_device_log("Retry connection to AP (%d/%d)", s_retry_num, MAXIMUM_RETRY);
         } else {
+            add_device_log("WiFi connection failed after max retries.");
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Successfully got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        char ip_str[32];
+        snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
+        add_device_log("Successfully got IP: %s", ip_str);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -452,11 +277,11 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     std::string html = html_page;
     html = replace_placeholder(html, "{{SSID}}", ssid);
     html = replace_placeholder(html, "{{PASSWORD}}", password);
-    html = replace_placeholder(html, "{{MQTT_SERVER}}", mqtt_server);
-    html = replace_placeholder(html, "{{MQTT_PORT}}", strlen(mqtt_port) > 0 ? mqtt_port : "1883");
-    html = replace_placeholder(html, "{{MQTT_USER}}", mqtt_user);
-    html = replace_placeholder(html, "{{MQTT_PASS}}", mqtt_pass);
-    html = replace_placeholder(html, "{{MQTT_TOPIC}}", mqtt_topic);
+    html = replace_placeholder(html, "{{MQTT_SERVER}}", strlen(mqtt_server) > 0 ? mqtt_server : "qms1.camdvr.org");
+    html = replace_placeholder(html, "{{MQTT_PORT}}", strlen(mqtt_port) > 0 ? mqtt_port : "1993");
+    html = replace_placeholder(html, "{{MQTT_USER}}", strlen(mqtt_user) > 0 ? mqtt_user : "thom");
+    html = replace_placeholder(html, "{{MQTT_PASS}}", strlen(mqtt_pass) > 0 ? mqtt_pass : "301258");
+    html = replace_placeholder(html, "{{MQTT_TOPIC}}", strlen(mqtt_topic) > 0 ? mqtt_topic : "qms/display");
     html = replace_placeholder(html, "{{WS_URL}}", ws_url);
     html = replace_placeholder(html, "{{DEV_ID}}", dev_id);
     html = replace_placeholder(html, "{{DEV_KEY}}", dev_key);
@@ -532,11 +357,17 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     const char* success_html_1 = 
     "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
     "<title>Success</title><style>"
-    "body { font-family: sans-serif; background: #121214; color: #fff; text-align: center; padding-top: 50px; }"
-    "h2 { color: #00adb5; }"
-    "</style></head><body>"
+    "body { font-family: sans-serif; background: #11161d; color: #fff; text-align: center; padding-top: 50px; }"
+    "h2 { color: #5ec98f; }"
+    ".btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #5ec98f; color: #0b0f14; text-decoration: none; font-weight: bold; border-radius: 4px; }"
+    "</style>"
+    "<script>"
+    "setTimeout(function() { window.location.href = '/log'; }, 4000);"
+    "</script>"
+    "</head><body>"
     "<h2>Configuration Saved Successfully!</h2>"
-    "<p>ESP32 will restart and apply the new configuration shortly.</p></body></html>";
+    "<p>ESP32 is rebooting. You will be redirected to the System Logs page in 4 seconds...</p>"
+    "<a href='/log' class=\"btn\">Go to Logs Now</a></body></html>";
     
     httpd_resp_sendstr_chunk(req, success_html_1);
     httpd_resp_sendstr_chunk(req, NULL);
@@ -544,6 +375,25 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     xTaskCreate(restart_task, "restart_task", 2048, NULL, 5, NULL);
 
     return ESP_OK;
+}
+
+static esp_err_t log_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, log_page, strlen(log_page));
+}
+
+static esp_err_t log_data_get_handler(httpd_req_t *req)
+{
+    std::string all_logs = "";
+    {
+        std::lock_guard<std::mutex> lock(g_log_mutex);
+        for (const auto& log_line : g_device_logs) {
+            all_logs += log_line + "\n";
+        }
+    }
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, all_logs.c_str(), all_logs.length());
 }
 
 static httpd_handle_t start_webserver(void)
@@ -569,6 +419,23 @@ static httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &config_post);
+
+        httpd_uri_t log_get = {
+            .uri       = "/log",
+            .method    = HTTP_GET,
+            .handler   = log_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &log_get);
+
+        httpd_uri_t log_data_get = {
+            .uri       = "/log_data",
+            .method    = HTTP_GET,
+            .handler   = log_data_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &log_data_get);
+
         return server;
     }
 
@@ -632,20 +499,20 @@ extern "C" void app_main(void)
     read_ws_config(ws_url, sizeof(ws_url));
     read_dev_credentials(dev_id, sizeof(dev_id), dev_key, sizeof(dev_key));
 
-    ESP_LOGI(TAG, "---------------------------------------------");
-    ESP_LOGI(TAG, "Loaded Device Configurations from NVS:");
-    ESP_LOGI(TAG, "  WiFi SSID      : %s", strlen(ssid) > 0 ? ssid : "[Not Set]");
-    ESP_LOGI(TAG, "  MQTT Broker    : %s:%s", strlen(mqtt_server) > 0 ? mqtt_server : "[Not Set]", strlen(mqtt_port) > 0 ? mqtt_port : "[Not Set]");
-    ESP_LOGI(TAG, "  MQTT Username  : %s", strlen(mqtt_user) > 0 ? mqtt_user : "[Not Set]");
-    ESP_LOGI(TAG, "  MQTT Topic     : %s", strlen(mqtt_topic) > 0 ? mqtt_topic : "[Not Set]");
-    ESP_LOGI(TAG, "  WebSocket URL  : %s", strlen(ws_url) > 0 ? ws_url : "[Not Set]");
-    ESP_LOGI(TAG, "  Device ID      : %s", strlen(dev_id) > 0 ? dev_id : "[Not Set]");
-    ESP_LOGI(TAG, "  Device KEY     : %s", strlen(dev_key) > 0 ? dev_key : "[Not Set]");
-    ESP_LOGI(TAG, "---------------------------------------------");
+    add_device_log("---------------------------------------------");
+    add_device_log("Loaded Device Configurations from NVS:");
+    add_device_log("  WiFi SSID      : %s", strlen(ssid) > 0 ? ssid : "[Not Set]");
+    add_device_log("  MQTT Broker    : %s:%s", strlen(mqtt_server) > 0 ? mqtt_server : "[Not Set]", strlen(mqtt_port) > 0 ? mqtt_port : "[Not Set]");
+    add_device_log("  MQTT Username  : %s", strlen(mqtt_user) > 0 ? mqtt_user : "[Not Set]");
+    add_device_log("  MQTT Topic     : %s", strlen(mqtt_topic) > 0 ? mqtt_topic : "[Not Set]");
+    add_device_log("  WebSocket URL  : %s", strlen(ws_url) > 0 ? ws_url : "[Not Set]");
+    add_device_log("  Device ID      : %s", strlen(dev_id) > 0 ? dev_id : "[Not Set]");
+    add_device_log("  Device KEY     : %s", strlen(dev_key) > 0 ? dev_key : "[Not Set]");
+    add_device_log("---------------------------------------------");
 
     bool connected = false;
     if (err == ESP_OK && strlen(ssid) > 0) {
-        ESP_LOGI(TAG, "Found stored WiFi credentials: SSID='%s'", ssid);
+        add_device_log("Found stored WiFi credentials: SSID='%s'", ssid);
         
         s_wifi_event_group = xEventGroupCreate();
         s_retry_num = 0;
@@ -659,7 +526,7 @@ extern "C" void app_main(void)
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
 
-        ESP_LOGI(TAG, "Waiting for WiFi connection...");
+        add_device_log("Waiting for WiFi connection...");
         EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                 WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                 pdFALSE,
@@ -667,21 +534,20 @@ extern "C" void app_main(void)
                 portMAX_DELAY);
 
         if (bits & WIFI_CONNECTED_BIT) {
-            ESP_LOGI(TAG, "Successfully connected to WiFi SSID: %s", ssid);
+            add_device_log("Successfully connected to WiFi SSID: %s", ssid);
             connected = true;
         } else if (bits & WIFI_FAIL_BIT) {
-            ESP_LOGW(TAG, "Failed to connect to WiFi SSID: %s after %d retries.", ssid, MAXIMUM_RETRY);
+            add_device_log("Failed to connect to WiFi SSID: %s after %d retries.", ssid, MAXIMUM_RETRY);
         }
 
         vEventGroupDelete(s_wifi_event_group);
     } else {
-        ESP_LOGI(TAG, "No stored WiFi credentials found in NVS.");
+        add_device_log("No stored WiFi credentials found in NVS.");
     }
 
     if (!connected) {
-        ESP_LOGI(TAG, "Starting Access Point and Captive Portal...");
+        add_device_log("Starting Access Point and Captive Portal...");
         
-        // Stop STA mode if it was started
         esp_wifi_stop();
 
         wifi_config_t wifi_config = {};
@@ -696,12 +562,12 @@ extern "C" void app_main(void)
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
 
-        ESP_LOGI(TAG, "AP Mode started. SSID: %s", ap_ssid);
-        ESP_LOGI(TAG, "Connect to the AP and open http://192.168.4.1 in your browser.");
+        add_device_log("AP Mode started. SSID: %s", ap_ssid);
+        add_device_log("Connect to AP and open http://192.168.4.1");
 
         start_webserver();
     } else {
-        ESP_LOGI(TAG, "Starting Web Server in Station mode...");
+        add_device_log("Starting Web Server in Station mode...");
         start_webserver();
 
         // Start MQTT client if broker is configured
@@ -716,7 +582,7 @@ extern "C" void app_main(void)
             }
             mqtt_app_start(mqtt_server, port, mqtt_user, mqtt_pass);
         } else {
-            ESP_LOGW(TAG, "MQTT Broker not configured. Skipping MQTT connection.");
+            add_device_log("MQTT Broker not configured. Skipping MQTT connection.");
         }
     }
 }

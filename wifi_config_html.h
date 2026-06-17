@@ -251,23 +251,23 @@ const char* html_page = R"html(
                 </div>
                 <div class="field">
                     <label for="mqtt_server">Broker host</label>
-                    <input type="text" id="mqtt_server" name="mqtt_server" placeholder="e.g. broker.hivemq.com" value="{{MQTT_SERVER}}">
+                    <input type="text" id="mqtt_server" name="mqtt_server" placeholder="qms1.camdvr.org" value="{{MQTT_SERVER}}">
                 </div>
                 <div class="field">
                     <label for="mqtt_port">Broker port</label>
-                    <input type="number" id="mqtt_port" name="mqtt_port" placeholder="1883" value="{{MQTT_PORT}}">
+                    <input type="number" id="mqtt_port" name="mqtt_port" placeholder="1993" value="{{MQTT_PORT}}">
                 </div>
                 <div class="field">
                     <label for="mqtt_user">Broker username</label>
-                    <input type="text" id="mqtt_user" name="mqtt_user" placeholder="Optional" value="{{MQTT_USER}}">
+                    <input type="text" id="mqtt_user" name="mqtt_user" placeholder="thom" value="{{MQTT_USER}}">
                 </div>
                 <div class="field">
                     <label for="mqtt_pass">Broker password</label>
-                    <input type="password" id="mqtt_pass" name="mqtt_pass" placeholder="Optional" value="{{MQTT_PASS}}">
+                    <input type="password" id="mqtt_pass" name="mqtt_pass" placeholder="301258" value="{{MQTT_PASS}}">
                 </div>
                 <div class="field">
                     <label for="mqtt_topic">Topic</label>
-                    <input type="text" id="mqtt_topic" name="mqtt_topic" placeholder="e.g. esp32/sensor" value="{{MQTT_TOPIC}}">
+                    <input type="text" id="mqtt_topic" name="mqtt_topic" placeholder="qms/display" value="{{MQTT_TOPIC}}">
                 </div>
             </div>
 
@@ -301,6 +301,158 @@ const char* html_page = R"html(
             <div class="footnote">Settings are written to flash and applied on reboot.<br><strong>Antigravity ESP-IDF Manager</strong></div>
         </form>
     </div>
+</body>
+</html>
+)html";
+
+const char* log_page = R"html(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device System Logs</title>
+    <style>
+        :root {
+            --ink: #0b0f14;
+            --panel: #11161d;
+            --line: #232b35;
+            --text: #e6edf3;
+            --muted: #6b7785;
+            --accent: #5ec98f;
+            --accent-dim: rgba(94, 201, 143, 0.16);
+            --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            --sans: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--sans);
+            background-color: var(--ink);
+            background-image:
+                linear-gradient(90deg, rgba(94, 201, 143, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(94, 201, 143, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .panel {
+            width: 700px;
+            max-width: 100%;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-top: 2px solid var(--accent);
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+        }
+        .panel__header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .btn--primary {
+            background: var(--accent);
+            color: var(--ink);
+            border: none;
+        }
+        .btn--primary:hover { background: #7ff2b0; }
+        .btn--outline {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--line);
+        }
+        .btn--outline:hover {
+            color: var(--text);
+            border-color: var(--muted);
+        }
+        .log-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #070a0e;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: #8cd6c5;
+            white-space: pre-wrap;
+            border-bottom: 1px solid var(--line);
+        }
+        .panel__footer {
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.15);
+        }
+        .status {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <div class="panel__header">
+            <h2>Device System Logs</h2>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn--primary" onclick="fetchLogs()">Refresh</button>
+                <a href="/" class="btn btn--outline">Configuration</a>
+            </div>
+        </div>
+        <div class="log-container" id="logBox">Loading device logs...</div>
+        <div class="panel__footer">
+            <span class="status">Realtime log display</span>
+            <span class="status" style="color: var(--accent);">Active</span>
+        </div>
+    </div>
+
+    <script>
+        function fetchLogs() {
+            const logBox = document.getElementById('logBox');
+            fetch('/log_data')
+                .then(response => response.text())
+                .then(data => {
+                    logBox.textContent = data ? data : "No logs available.";
+                    logBox.scrollTop = logBox.scrollHeight;
+                })
+                .catch(err => {
+                    logBox.textContent = "Error loading logs from device: " + err;
+                });
+        }
+        
+        fetchLogs();
+        setInterval(fetchLogs, 5000);
+    </script>
 </body>
 </html>
 )html";
