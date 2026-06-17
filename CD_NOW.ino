@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -75,6 +76,65 @@ esp_err_t read_wifi_credentials(char* ssid, size_t ssid_len, char* password, siz
     return ESP_OK;
 }
 
+esp_err_t save_mqtt_config(const char* server, const char* port, const char* user, const char* pass) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("mqtt_config", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+        return err;
+    }
+    nvs_set_str(my_handle, "server", server);
+    nvs_set_str(my_handle, "port", port);
+    nvs_set_str(my_handle, "user", user);
+    nvs_set_str(my_handle, "pass", pass);
+    nvs_commit(my_handle);
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t port_len, char* user, size_t user_len, char* pass, size_t pass_len) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("mqtt_config", NVS_READONLY, &my_handle);
+    if (err != ESP_OK) {
+        server[0] = '\0';
+        port[0] = '\0';
+        user[0] = '\0';
+        pass[0] = '\0';
+        return err;
+    }
+    if (nvs_get_str(my_handle, "server", server, &server_len) != ESP_OK) server[0] = '\0';
+    if (nvs_get_str(my_handle, "port", port, &port_len) != ESP_OK) port[0] = '\0';
+    if (nvs_get_str(my_handle, "user", user, &user_len) != ESP_OK) user[0] = '\0';
+    if (nvs_get_str(my_handle, "pass", pass, &pass_len) != ESP_OK) pass[0] = '\0';
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+esp_err_t save_ws_config(const char* url) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("ws_config", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+        return err;
+    }
+    nvs_set_str(my_handle, "url", url);
+    nvs_commit(my_handle);
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+esp_err_t read_ws_config(char* url, size_t url_len) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("ws_config", NVS_READONLY, &my_handle);
+    if (err != ESP_OK) {
+        url[0] = '\0';
+        return err;
+    }
+    if (nvs_get_str(my_handle, "url", url, &url_len) != ESP_OK) url[0] = '\0';
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
 // Event handler for wifi and IP events
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -125,10 +185,66 @@ void url_decode(char *dst, const char *src) {
 
 // Web Server Handlers (html_page is imported from wifi_config_html.h)
 
+// Helper function to replace placeholders in a string
+std::string replace_placeholder(std::string str, const std::string& placeholder, const std::string& replacement) {
+    size_t pos = 0;
+    while ((pos = str.find(placeholder, pos)) != std::string::npos) {
+        str.replace(pos, placeholder.length(), replacement);
+        pos += replacement.length();
+    }
+    return str;
+}
+
+// Helper function to extract and decode a URL parameter
+bool parse_url_param(const char* body, const char* key, char* dst, size_t dst_max) {
+    char key_eq[64];
+    snprintf(key_eq, sizeof(key_eq), "%s=", key);
+    const char* ptr = strstr(body, key_eq);
+    if (!ptr) {
+        dst[0] = '\0';
+        return false;
+    }
+    ptr += strlen(key_eq);
+    const char* end = strchr(ptr, '&');
+    size_t len = end ? (size_t)(end - ptr) : strlen(ptr);
+    if (len >= dst_max) {
+        len = dst_max - 1;
+    }
+    char raw[256];
+    if (len >= sizeof(raw)) len = sizeof(raw) - 1;
+    strncpy(raw, ptr, len);
+    raw[len] = '\0';
+    url_decode(dst, raw);
+    return true;
+}
+
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
+    char ssid[64] = {0};
+    char password[64] = {0};
+    char mqtt_server[64] = {0};
+    char mqtt_port[16] = {0};
+    char mqtt_user[64] = {0};
+    char mqtt_pass[64] = {0};
+    char ws_url[128] = {0};
+
+    // Read current config
+    read_wifi_credentials(ssid, sizeof(ssid), password, sizeof(password));
+    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass));
+    read_ws_config(ws_url, sizeof(ws_url));
+
+    // Substitute placeholders
+    std::string html = html_page;
+    html = replace_placeholder(html, "{{SSID}}", ssid);
+    html = replace_placeholder(html, "{{PASSWORD}}", password);
+    html = replace_placeholder(html, "{{MQTT_SERVER}}", mqtt_server);
+    html = replace_placeholder(html, "{{MQTT_PORT}}", strlen(mqtt_port) > 0 ? mqtt_port : "1883");
+    html = replace_placeholder(html, "{{MQTT_USER}}", mqtt_user);
+    html = replace_placeholder(html, "{{MQTT_PASS}}", mqtt_pass);
+    html = replace_placeholder(html, "{{WS_URL}}", ws_url);
+
     httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, html_page, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_send(req, html.c_str(), html.length());
 }
 
 void restart_task(void *pvParameters) {
@@ -139,7 +255,7 @@ void restart_task(void *pvParameters) {
 
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[256];
+    char buf[1024];
     int ret, remaining = req->content_len;
 
     if (remaining >= sizeof(buf)) {
@@ -160,42 +276,31 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
     buf[cur_len] = '\0';
 
-    char raw_ssid[64] = {0};
-    char raw_pass[64] = {0};
     char ssid[64] = {0};
     char password[64] = {0};
+    char mqtt_server[64] = {0};
+    char mqtt_port[16] = {0};
+    char mqtt_user[64] = {0};
+    char mqtt_pass[64] = {0};
+    char ws_url[128] = {0};
 
-    char* ssid_ptr = strstr(buf, "ssid=");
-    if (ssid_ptr) {
-        ssid_ptr += 5;
-        char* end = strchr(ssid_ptr, '&');
-        if (end) {
-            strncpy(raw_ssid, ssid_ptr, end - ssid_ptr);
-        } else {
-            strcpy(raw_ssid, ssid_ptr);
-        }
-    }
+    parse_url_param(buf, "ssid", ssid, sizeof(ssid));
+    parse_url_param(buf, "password", password, sizeof(password));
+    parse_url_param(buf, "mqtt_server", mqtt_server, sizeof(mqtt_server));
+    parse_url_param(buf, "mqtt_port", mqtt_port, sizeof(mqtt_port));
+    parse_url_param(buf, "mqtt_user", mqtt_user, sizeof(mqtt_user));
+    parse_url_param(buf, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
+    parse_url_param(buf, "ws_url", ws_url, sizeof(ws_url));
 
-    char* pass_ptr = strstr(buf, "password=");
-    if (pass_ptr) {
-        pass_ptr += 9;
-        char* end = strchr(pass_ptr, '&');
-        if (end) {
-            strncpy(raw_pass, pass_ptr, end - pass_ptr);
-        } else {
-            strcpy(raw_pass, pass_ptr);
-        }
-    }
+    ESP_LOGI(TAG, "Saving configurations...");
 
-    url_decode(ssid, raw_ssid);
-    url_decode(password, raw_pass);
+    esp_err_t err1 = save_wifi_credentials(ssid, password);
+    esp_err_t err2 = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass);
+    esp_err_t err3 = save_ws_config(ws_url);
 
-    ESP_LOGI(TAG, "Saving credentials: SSID='%s'", ssid);
-
-    esp_err_t err = save_wifi_credentials(ssid, password);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save credentials to NVS!");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save credentials");
+    if (err1 != ESP_OK || err2 != ESP_OK || err3 != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save configuration to NVS!");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save configuration");
         return ESP_FAIL;
     }
 
@@ -205,12 +310,10 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     "body { font-family: sans-serif; background: #121214; color: #fff; text-align: center; padding-top: 50px; }"
     "h2 { color: #00adb5; }"
     "</style></head><body>"
-    "<h2>WiFi Credentials Saved!</h2>"
-    "<p>ESP32 will restart and connect to <strong>";
+    "<h2>Configuration Saved Successfully!</h2>"
+    "<p>ESP32 will restart and apply the new configuration shortly.</p></body></html>";
     
     httpd_resp_sendstr_chunk(req, success_html_1);
-    httpd_resp_sendstr_chunk(req, ssid);
-    httpd_resp_sendstr_chunk(req, "</strong> shortly.</p></body></html>");
     httpd_resp_sendstr_chunk(req, NULL);
 
     xTaskCreate(restart_task, "restart_task", 2048, NULL, 5, NULL);
@@ -287,10 +390,26 @@ extern "C" void app_main(void)
                                                         NULL,
                                                         &instance_got_ip));
 
-    // Read wifi configuration from NVS
+    // Read WiFi, MQTT, and WebSocket configuration
     char ssid[64] = {0};
     char password[64] = {0};
     esp_err_t err = read_wifi_credentials(ssid, sizeof(ssid), password, sizeof(password));
+
+    char mqtt_server[64] = {0};
+    char mqtt_port[16] = {0};
+    char mqtt_user[64] = {0};
+    char mqtt_pass[64] = {0};
+    char ws_url[128] = {0};
+    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass));
+    read_ws_config(ws_url, sizeof(ws_url));
+
+    ESP_LOGI(TAG, "---------------------------------------------");
+    ESP_LOGI(TAG, "Loaded Device Configurations from NVS:");
+    ESP_LOGI(TAG, "  WiFi SSID      : %s", strlen(ssid) > 0 ? ssid : "[Not Set]");
+    ESP_LOGI(TAG, "  MQTT Broker    : %s:%s", strlen(mqtt_server) > 0 ? mqtt_server : "[Not Set]", strlen(mqtt_port) > 0 ? mqtt_port : "[Not Set]");
+    ESP_LOGI(TAG, "  MQTT Username  : %s", strlen(mqtt_user) > 0 ? mqtt_user : "[Not Set]");
+    ESP_LOGI(TAG, "  WebSocket URL  : %s", strlen(ws_url) > 0 ? ws_url : "[Not Set]");
+    ESP_LOGI(TAG, "---------------------------------------------");
 
     bool connected = false;
     if (err == ESP_OK && strlen(ssid) > 0) {
