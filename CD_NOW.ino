@@ -14,6 +14,8 @@
 #include "esp_netif.h"
 #include "esp_http_server.h"
 #include "esp_system.h"
+#include "mqtt_client.h"
+#include "cJSON.h"
 #include "wifi_config_html.h"
 
 static const char *TAG = "wifi_manager";
@@ -24,6 +26,12 @@ static EventGroupHandle_t s_wifi_event_group;
 
 static int s_retry_num = 0;
 #define MAXIMUM_RETRY  3
+
+// MQTT globals
+static esp_mqtt_client_handle_t mqtt_client = NULL;
+static char g_dev_id[128] = {0};
+static char g_dev_key[128] = {0};
+static char g_mqtt_topic[256] = {0};
 
 // NVS Helper functions
 esp_err_t save_wifi_credentials(const char* ssid, const char* password) {
@@ -166,6 +174,162 @@ esp_err_t read_dev_credentials(char* dev_id, size_t id_len, char* dev_key, size_
     return ESP_OK;
 }
 
+// ==================== MQTT CLIENT ====================
+static const char *MQTT_TAG = "mqtt_qms";
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+    esp_mqtt_client_handle_t client = event->client;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(MQTT_TAG, "============================================");
+        ESP_LOGI(MQTT_TAG, "MQTT CONNECTED to broker!");
+        ESP_LOGI(MQTT_TAG, "============================================");
+        // Subscribe to display command topic
+        if (strlen(g_dev_id) > 0) {
+            char sub_topic[256];
+            snprintf(sub_topic, sizeof(sub_topic), "qms/display/%s/command", g_dev_id);
+            int msg_id = esp_mqtt_client_subscribe(client, sub_topic, 1);
+            ESP_LOGI(MQTT_TAG, "Subscribing to topic: %s (msg_id=%d)", sub_topic, msg_id);
+        }
+        break;
+
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGW(MQTT_TAG, "MQTT DISCONNECTED from broker. Will auto-reconnect...");
+        break;
+
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(MQTT_TAG, "MQTT SUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(MQTT_TAG, "MQTT UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGD(MQTT_TAG, "MQTT PUBLISHED, msg_id=%d", event->msg_id);
+        break;
+
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(MQTT_TAG, "============================================");
+        ESP_LOGI(MQTT_TAG, "MQTT DATA RECEIVED");
+        ESP_LOGI(MQTT_TAG, "  Topic: %.*s", event->topic_len, event->topic);
+        ESP_LOGI(MQTT_TAG, "  Payload: %.*s", event->data_len, event->data);
+        ESP_LOGI(MQTT_TAG, "============================================");
+
+        // Parse JSON
+        {
+            char *json_buf = (char*)malloc(event->data_len + 1);
+            if (json_buf) {
+                memcpy(json_buf, event->data, event->data_len);
+                json_buf[event->data_len] = '\0';
+
+                cJSON *root = cJSON_Parse(json_buf);
+                if (root) {
+                    cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
+                    if (cmd && cJSON_IsString(cmd)) {
+                        if (strcmp(cmd->valuestring, "display_ticket") == 0) {
+                            cJSON *data = cJSON_GetObjectItem(root, "data");
+                            if (data) {
+                                const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
+                                const char *counter = cJSON_GetStringValue(cJSON_GetObjectItem(data, "counter"));
+                                const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
+                                const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+                                ESP_LOGI(MQTT_TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                                ESP_LOGI(MQTT_TAG, "  CMD: display_ticket");
+                                ESP_LOGI(MQTT_TAG, "  TICKET : %s", ticket ? ticket : "N/A");
+                                ESP_LOGI(MQTT_TAG, "  COUNTER: %s", counter ? counter : "N/A");
+                                ESP_LOGI(MQTT_TAG, "  SERVICE: %s", service ? service : "N/A");
+                                if (cust_name) {
+                                    ESP_LOGI(MQTT_TAG, "  CUSTOMER: %s", cust_name);
+                                }
+                                ESP_LOGI(MQTT_TAG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                            }
+                        } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
+                            ESP_LOGI(MQTT_TAG, "  CMD: clear_display - Clearing screen");
+                        } else {
+                            ESP_LOGI(MQTT_TAG, "  Unknown CMD: %s", cmd->valuestring);
+                        }
+                    }
+                    cJSON_Delete(root);
+                } else {
+                    ESP_LOGW(MQTT_TAG, "Failed to parse JSON payload");
+                }
+                free(json_buf);
+            }
+        }
+        break;
+
+    case MQTT_EVENT_ERROR:
+        ESP_LOGE(MQTT_TAG, "MQTT ERROR");
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+            ESP_LOGE(MQTT_TAG, "  Transport error: 0x%x", event->error_handle->esp_transport_sock_errno);
+        }
+        break;
+
+    default:
+        ESP_LOGD(MQTT_TAG, "MQTT event id: %d", event->event_id);
+        break;
+    }
+}
+
+// Heartbeat task: publish heartbeat every 20s
+static void mqtt_heartbeat_task(void *pvParameters)
+{
+    char hb_topic[256];
+    snprintf(hb_topic, sizeof(hb_topic), "qms/heartbeat/%s", g_dev_id);
+
+    char hb_payload[256];
+    snprintf(hb_payload, sizeof(hb_payload), "{\"secret_key\":\"%s\"}", g_dev_key);
+
+    ESP_LOGI(MQTT_TAG, "Heartbeat task started. Topic: %s", hb_topic);
+
+    while (1) {
+        if (mqtt_client) {
+            int msg_id = esp_mqtt_client_publish(mqtt_client, hb_topic, hb_payload, 0, 0, 0);
+            ESP_LOGI(MQTT_TAG, "Heartbeat sent (msg_id=%d)", msg_id);
+        }
+        vTaskDelay(pdMS_TO_TICKS(20000)); // 20 seconds
+    }
+}
+
+void mqtt_app_start(const char* broker, int port, const char* user, const char* pass)
+{
+    ESP_LOGI(MQTT_TAG, "============================================");
+    ESP_LOGI(MQTT_TAG, "Starting MQTT Client");
+    ESP_LOGI(MQTT_TAG, "  Broker: %s:%d", broker, port);
+    ESP_LOGI(MQTT_TAG, "  User  : %s", strlen(user) > 0 ? user : "[none]");
+    ESP_LOGI(MQTT_TAG, "  Dev ID: %.16s...", g_dev_id);
+    ESP_LOGI(MQTT_TAG, "============================================");
+
+    char uri[256];
+    snprintf(uri, sizeof(uri), "mqtt://%s:%d", broker, port);
+
+    esp_mqtt_client_config_t mqtt_cfg = {};
+    mqtt_cfg.broker.address.uri = uri;
+    if (strlen(user) > 0) {
+        mqtt_cfg.credentials.username = user;
+    }
+    if (strlen(pass) > 0) {
+        mqtt_cfg.credentials.authentication.password = pass;
+    }
+    mqtt_cfg.network.reconnect_timeout_ms = 5000;
+
+    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(mqtt_client);
+
+    // Start heartbeat task
+    if (strlen(g_dev_id) > 0 && strlen(g_dev_key) > 0) {
+        xTaskCreate(mqtt_heartbeat_task, "mqtt_hb", 4096, NULL, 5, NULL);
+    } else {
+        ESP_LOGW(MQTT_TAG, "Device ID or KEY not set, heartbeat disabled.");
+    }
+}
+
+// ==================== WIFI EVENT HANDLER ====================
 // Event handler for wifi and IP events
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -523,5 +687,20 @@ extern "C" void app_main(void)
     } else {
         ESP_LOGI(TAG, "Starting Web Server in Station mode...");
         start_webserver();
+
+        // Start MQTT client if broker is configured
+        if (strlen(mqtt_server) > 0) {
+            // Copy dev credentials to globals for MQTT tasks
+            strncpy(g_dev_id, dev_id, sizeof(g_dev_id) - 1);
+            strncpy(g_dev_key, dev_key, sizeof(g_dev_key) - 1);
+
+            int port = 1883;
+            if (strlen(mqtt_port) > 0) {
+                port = atoi(mqtt_port);
+            }
+            mqtt_app_start(mqtt_server, port, mqtt_user, mqtt_pass);
+        } else {
+            ESP_LOGW(TAG, "MQTT Broker not configured. Skipping MQTT connection.");
+        }
     }
 }
