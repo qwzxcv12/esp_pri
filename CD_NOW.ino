@@ -446,5 +446,8 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Connect to the AP and open http://192.168.4.1 in your browser.");
 
         start_webserver();
+    } else {
+        ESP_LOGI(TAG, "Starting Web Server in Station mode...");
+        start_webserver();
     }
 }
