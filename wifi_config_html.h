@@ -145,6 +145,10 @@ const char* html_page = R"html(
                 <label for="mqtt_pass">MQTT Password</label>
                 <input type="password" id="mqtt_pass" name="mqtt_pass" placeholder="Optional" value="{{MQTT_PASS}}">
             </div>
+            <div class="input-group">
+                <label for="mqtt_topic">MQTT Topic</label>
+                <input type="text" id="mqtt_topic" name="mqtt_topic" placeholder="e.g. esp32/sensor" value="{{MQTT_TOPIC}}">
+            </div>
             
             <div class="section-title">WebSocket Settings</div>
             <div class="input-group">

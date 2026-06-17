@@ -76,7 +76,7 @@ esp_err_t read_wifi_credentials(char* ssid, size_t ssid_len, char* password, siz
     return ESP_OK;
 }
 
-esp_err_t save_mqtt_config(const char* server, const char* port, const char* user, const char* pass) {
+esp_err_t save_mqtt_config(const char* server, const char* port, const char* user, const char* pass, const char* topic) {
     nvs_handle_t my_handle;
     esp_err_t err = nvs_open("mqtt_config", NVS_READWRITE, &my_handle);
     if (err != ESP_OK) {
@@ -87,12 +87,13 @@ esp_err_t save_mqtt_config(const char* server, const char* port, const char* use
     nvs_set_str(my_handle, "port", port);
     nvs_set_str(my_handle, "user", user);
     nvs_set_str(my_handle, "pass", pass);
+    nvs_set_str(my_handle, "topic", topic);
     nvs_commit(my_handle);
     nvs_close(my_handle);
     return ESP_OK;
 }
 
-esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t port_len, char* user, size_t user_len, char* pass, size_t pass_len) {
+esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t port_len, char* user, size_t user_len, char* pass, size_t pass_len, char* topic, size_t topic_len) {
     nvs_handle_t my_handle;
     esp_err_t err = nvs_open("mqtt_config", NVS_READONLY, &my_handle);
     if (err != ESP_OK) {
@@ -100,12 +101,14 @@ esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t p
         port[0] = '\0';
         user[0] = '\0';
         pass[0] = '\0';
+        topic[0] = '\0';
         return err;
     }
     if (nvs_get_str(my_handle, "server", server, &server_len) != ESP_OK) server[0] = '\0';
     if (nvs_get_str(my_handle, "port", port, &port_len) != ESP_OK) port[0] = '\0';
     if (nvs_get_str(my_handle, "user", user, &user_len) != ESP_OK) user[0] = '\0';
     if (nvs_get_str(my_handle, "pass", pass, &pass_len) != ESP_OK) pass[0] = '\0';
+    if (nvs_get_str(my_handle, "topic", topic, &topic_len) != ESP_OK) topic[0] = '\0';
     nvs_close(my_handle);
     return ESP_OK;
 }
@@ -226,11 +229,12 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     char mqtt_port[16] = {0};
     char mqtt_user[64] = {0};
     char mqtt_pass[64] = {0};
+    char mqtt_topic[64] = {0};
     char ws_url[128] = {0};
 
     // Read current config
     read_wifi_credentials(ssid, sizeof(ssid), password, sizeof(password));
-    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass));
+    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass), mqtt_topic, sizeof(mqtt_topic));
     read_ws_config(ws_url, sizeof(ws_url));
 
     // Substitute placeholders
@@ -241,6 +245,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     html = replace_placeholder(html, "{{MQTT_PORT}}", strlen(mqtt_port) > 0 ? mqtt_port : "1883");
     html = replace_placeholder(html, "{{MQTT_USER}}", mqtt_user);
     html = replace_placeholder(html, "{{MQTT_PASS}}", mqtt_pass);
+    html = replace_placeholder(html, "{{MQTT_TOPIC}}", mqtt_topic);
     html = replace_placeholder(html, "{{WS_URL}}", ws_url);
 
     httpd_resp_set_type(req, "text/html");
@@ -282,6 +287,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     char mqtt_port[16] = {0};
     char mqtt_user[64] = {0};
     char mqtt_pass[64] = {0};
+    char mqtt_topic[64] = {0};
     char ws_url[128] = {0};
 
     parse_url_param(buf, "ssid", ssid, sizeof(ssid));
@@ -290,12 +296,13 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     parse_url_param(buf, "mqtt_port", mqtt_port, sizeof(mqtt_port));
     parse_url_param(buf, "mqtt_user", mqtt_user, sizeof(mqtt_user));
     parse_url_param(buf, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
+    parse_url_param(buf, "mqtt_topic", mqtt_topic, sizeof(mqtt_topic));
     parse_url_param(buf, "ws_url", ws_url, sizeof(ws_url));
 
     ESP_LOGI(TAG, "Saving configurations...");
 
     esp_err_t err1 = save_wifi_credentials(ssid, password);
-    esp_err_t err2 = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass);
+    esp_err_t err2 = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass, mqtt_topic);
     esp_err_t err3 = save_ws_config(ws_url);
 
     if (err1 != ESP_OK || err2 != ESP_OK || err3 != ESP_OK) {
@@ -399,8 +406,9 @@ extern "C" void app_main(void)
     char mqtt_port[16] = {0};
     char mqtt_user[64] = {0};
     char mqtt_pass[64] = {0};
+    char mqtt_topic[64] = {0};
     char ws_url[128] = {0};
-    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass));
+    read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass), mqtt_topic, sizeof(mqtt_topic));
     read_ws_config(ws_url, sizeof(ws_url));
 
     ESP_LOGI(TAG, "---------------------------------------------");
@@ -408,6 +416,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "  WiFi SSID      : %s", strlen(ssid) > 0 ? ssid : "[Not Set]");
     ESP_LOGI(TAG, "  MQTT Broker    : %s:%s", strlen(mqtt_server) > 0 ? mqtt_server : "[Not Set]", strlen(mqtt_port) > 0 ? mqtt_port : "[Not Set]");
     ESP_LOGI(TAG, "  MQTT Username  : %s", strlen(mqtt_user) > 0 ? mqtt_user : "[Not Set]");
+    ESP_LOGI(TAG, "  MQTT Topic     : %s", strlen(mqtt_topic) > 0 ? mqtt_topic : "[Not Set]");
     ESP_LOGI(TAG, "  WebSocket URL  : %s", strlen(ws_url) > 0 ? ws_url : "[Not Set]");
     ESP_LOGI(TAG, "---------------------------------------------");
 
