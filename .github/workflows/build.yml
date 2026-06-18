@@ -50,7 +50,7 @@ jobs:
 
           # 5. U8g2
           git clone --depth 1 https://github.com/olikraus/u8g2.git project/components/u8g2
-          echo 'idf_component_register()' > project/components/u8g2/CMakeLists.txt
+          echo 'idf_component_register(SRC_DIRS "csrc" INCLUDE_DIRS "csrc")' > project/components/u8g2/CMakeLists.txt
 
       - name: Build Firmware
         shell: bash
