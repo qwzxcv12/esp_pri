@@ -15,6 +15,7 @@
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "wifi_config_html.h"
+#include "led_display.h"
 #include "mqtt_handler.h"
 
 static const char *TAG = "wifi_manager";
@@ -516,6 +517,9 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "NVS Storage Initialized");
+
+    // Initialize LED Display
+    setup_led_display();
 
     // Initialize Network and Events
     ESP_ERROR_CHECK(esp_netif_init());

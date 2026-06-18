@@ -127,7 +127,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     case MQTT_EVENT_DATA:
         add_device_log("MQTT Msg Rx on topic: %.*s", event->topic_len, event->topic);
-        // Parse JSON
         {
             char *json_buf = (char*)malloc(event->data_len + 1);
             if (json_buf) {
@@ -136,6 +135,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 add_device_log("Payload: %s", json_buf);
 
                 cJSON *root = cJSON_Parse(json_buf);
+                bool processed = false;
                 if (root) {
                     cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
                     if (cmd && cJSON_IsString(cmd)) {
@@ -144,28 +144,37 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                             if (data) {
                                 const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
                                 const char *counter = cJSON_GetStringValue(cJSON_GetObjectItem(data, "counter"));
-                                const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
+                                const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+                                
+                                char disp_msg[128];
+                                snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
+                                processMessage(disp_msg);
+                                processed = true;
+
                                 if (cust_name) {
-                                    add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s, Customer=%s", 
+                                    add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Customer=%s", 
                                         ticket ? ticket : "N/A", 
                                         counter ? counter : "N/A", 
-                                        service ? service : "N/A",
                                         cust_name);
                                 } else {
-                                    add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s", 
+                                    add_device_log(">>> CALLING: Ticket=%s, Counter=%s", 
                                         ticket ? ticket : "N/A", 
-                                        counter ? counter : "N/A", 
-                                        service ? service : "N/A");
+                                        counter ? counter : "N/A");
                                 }
                             }
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
+                            processMessage("clear");
                             add_device_log(">>> COMMAND: Clear screen");
+                            processed = true;
                         }
                     }
                     cJSON_Delete(root);
-                } else {
-                    add_device_log("Warning: Failed to parse JSON");
+                }
+                
+                // If not standard JSON display command, print raw message payload directly on LED
+                if (!processed && strlen(json_buf) > 0) {
+                    processMessage(json_buf);
                 }
                 free(json_buf);
             }

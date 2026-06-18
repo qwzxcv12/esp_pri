@@ -780,6 +780,7 @@ const char* log_page = R"html(
         <div class="log-control">
             <div style="display: flex; border-bottom: 1px solid var(--line); margin-bottom: 6px; gap: 8px;">
                 <button type="button" class="tab-btn active" id="tabKioskBtn" onclick="switchControlTab('kiosk')">Kiosk Sim</button>
+                <button type="button" class="tab-btn" id="tabLedBtn" onclick="switchControlTab('led')">LED Test</button>
                 <button type="button" class="tab-btn" id="tabManualBtn" onclick="switchControlTab('manual')">Manual Publish</button>
                 <span id="kioskStatus" style="margin-left: auto; font-family: var(--mono); font-size: 11px; align-self: center; color: var(--muted);">Ready</span>
             </div>
@@ -798,7 +799,29 @@ const char* log_page = R"html(
                 </div>
             </div>
 
-            <!-- Tab 2: Manual Control -->
+            <!-- Tab 2: LED Control Panel -->
+            <div id="ledControlPanel" style="display: none; flex-direction: column; gap: 10px;">
+                <div class="log-control__row">
+                    <input type="text" id="ledTicketInput" placeholder="Enter Ticket Number (e.g. 1005, BH-003)" style="flex: 1;">
+                    <select id="ledColorSelect">
+                        <option value="do">Red (Đỏ)</option>
+                        <option value="xanh">Green (Xanh lá)</option>
+                        <option value="vang">Yellow (Vàng)</option>
+                        <option value="lam">Blue (Xanh lam)</option>
+                        <option value="tim">Purple (Tím)</option>
+                        <option value="cam">Orange (Cam)</option>
+                        <option value="trang">White (Trắng)</option>
+                        <option value="hong">Pink (Hồng)</option>
+                    </select>
+                </div>
+                <div class="log-control__row">
+                    <input type="text" id="ledCounterInput" placeholder="Enter Counter (e.g. Counter 03)" style="flex: 1;">
+                    <button class="btn btn--primary" onclick="sendLedTicket()" style="padding: 10px 14px; background-color: var(--accent); color: var(--ink);">Display Ticket</button>
+                    <button class="btn btn--primary" onclick="clearLedDisplay()" style="padding: 10px 14px; background-color: var(--muted); color: #fff;">Clear Display</button>
+                </div>
+            </div>
+
+            <!-- Tab 3: Manual Control -->
             <div id="manualControlPanel" style="display: none; flex-direction: column; gap: 10px;">
                 <div class="log-control__row">
                     <input type="text" id="cmdTopic" placeholder="Topic to publish..." style="flex: 1;">
@@ -834,21 +857,57 @@ const char* log_page = R"html(
 
         function switchControlTab(tab) {
             const kioskPanel = document.getElementById('kioskControlPanel');
+            const ledPanel = document.getElementById('ledControlPanel');
             const manualPanel = document.getElementById('manualControlPanel');
             const kioskBtn = document.getElementById('tabKioskBtn');
+            const ledBtn = document.getElementById('tabLedBtn');
             const manualBtn = document.getElementById('tabManualBtn');
+            
+            kioskPanel.style.display = 'none';
+            ledPanel.style.display = 'none';
+            manualPanel.style.display = 'none';
+            kioskBtn.classList.remove('active');
+            ledBtn.classList.remove('active');
+            manualBtn.classList.remove('active');
             
             if (tab === 'kiosk') {
                 kioskPanel.style.display = 'flex';
-                manualPanel.style.display = 'none';
                 kioskBtn.classList.add('active');
-                manualBtn.classList.remove('active');
+            } else if (tab === 'led') {
+                ledPanel.style.display = 'flex';
+                ledBtn.classList.add('active');
             } else {
-                kioskPanel.style.display = 'none';
                 manualPanel.style.display = 'flex';
-                kioskBtn.classList.remove('active');
                 manualBtn.classList.add('active');
             }
+        }
+
+        function sendLedTicket() {
+            const ticket = document.getElementById('ledTicketInput').value.trim();
+            const color = document.getElementById('ledColorSelect').value;
+            const counter = document.getElementById('ledCounterInput').value.trim() || "Counter 01";
+            if (!ticket) {
+                alert("Please enter a ticket number!");
+                return;
+            }
+            
+            const topic = "qms/display";
+            const payload = JSON.stringify({
+                cmd: "display_ticket",
+                data: {
+                    ticket: ticket,
+                    counter: counter,
+                    color: color,
+                    cust_name: ""
+                }
+            });
+            sendMqtt(topic, payload, `Sending ticket ${ticket} to LED...`);
+        }
+
+        function clearLedDisplay() {
+            const topic = "qms/display";
+            const payload = JSON.stringify({ cmd: "clear_display" });
+            sendMqtt(topic, payload, "Clearing LED Display...");
         }
 
         function syncServices() {
