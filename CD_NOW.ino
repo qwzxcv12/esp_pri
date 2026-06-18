@@ -243,10 +243,10 @@ bool parse_url_param(const char* body, const char* key, char* dst, size_t dst_ma
     ptr += strlen(key_eq);
     const char* end = strchr(ptr, '&');
     size_t len = end ? (size_t)(end - ptr) : strlen(ptr);
-    if (len >= dst_max) {
-        len = dst_max - 1;
+    if (len >= dst_max * 3) {
+        len = dst_max * 3 - 1;
     }
-    char raw[256];
+    char raw[1024];
     if (len >= sizeof(raw)) len = sizeof(raw) - 1;
     strncpy(raw, ptr, len);
     raw[len] = '\0';
@@ -298,20 +298,21 @@ void restart_task(void *pvParameters) {
 
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
-    char buf[1024];
-    int ret, remaining = req->content_len;
-
-    if (remaining >= sizeof(buf)) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Payload too long");
+    int remaining = req->content_len;
+    char *buf = (char*)malloc(remaining + 1);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
         return ESP_FAIL;
     }
 
     int cur_len = 0;
+    int ret;
     while (remaining > 0) {
         if ((ret = httpd_req_recv(req, buf + cur_len, remaining)) <= 0) {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
             }
+            free(buf);
             return ESP_FAIL;
         }
         cur_len += ret;
@@ -340,6 +341,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     parse_url_param(buf, "ws_url", ws_url, sizeof(ws_url));
     parse_url_param(buf, "dev_id", dev_id, sizeof(dev_id));
     parse_url_param(buf, "dev_key", dev_key, sizeof(dev_key));
+    free(buf);
 
     ESP_LOGI(TAG, "Saving configurations...");
 
@@ -400,20 +402,21 @@ static esp_err_t log_data_get_handler(httpd_req_t *req)
 
 static esp_err_t publish_post_handler(httpd_req_t *req)
 {
-    char buf[1024];
-    int ret, remaining = req->content_len;
-
-    if (remaining >= sizeof(buf)) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Payload too long");
+    int remaining = req->content_len;
+    char *buf = (char*)malloc(remaining + 1);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
         return ESP_FAIL;
     }
 
     int cur_len = 0;
+    int ret;
     while (remaining > 0) {
         if ((ret = httpd_req_recv(req, buf + cur_len, remaining)) <= 0) {
             if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
             }
+            free(buf);
             return ESP_FAIL;
         }
         cur_len += ret;
@@ -426,6 +429,7 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
 
     parse_url_param(buf, "topic", topic, sizeof(topic));
     parse_url_param(buf, "payload", payload, sizeof(payload));
+    free(buf);
 
     if (strlen(topic) > 0 && strlen(payload) > 0) {
         if (mqtt_client) {
@@ -448,6 +452,7 @@ static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 16384; // Increase stack size to prevent stack overflow
     config.lru_purge_enable = true;
 
     ESP_LOGI(TAG, "Starting web server on port: %d", config.server_port);
