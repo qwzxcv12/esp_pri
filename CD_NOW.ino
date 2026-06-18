@@ -14,8 +14,9 @@
 #include "esp_netif.h"
 #include "esp_http_server.h"
 #include "esp_system.h"
-#include "lwip/sockets.h"
-#include "lwip/netdb.h"
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include "wifi_config_html.h"
 #include "Arduino.h"
 #include "led_display.h"
