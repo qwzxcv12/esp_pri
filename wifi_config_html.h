@@ -819,6 +819,12 @@ const char* log_page = R"html(
                     <button class="btn btn--primary" onclick="sendLedTicket()" style="padding: 10px 14px; background-color: var(--accent); color: var(--ink);">Display Ticket</button>
                     <button class="btn btn--primary" onclick="clearLedDisplay()" style="padding: 10px 14px; background-color: var(--muted); color: #fff;">Clear Display</button>
                 </div>
+                <div class="log-control__row" style="margin-top: 5px; border-top: 1px dashed var(--line); padding-top: 8px;">
+                    <span style="font-family: var(--mono); font-size: 11px; color: var(--muted);">Quick Test Numbers:</span>
+                    <button type="button" class="btn" onclick="quickTestNumber('1001')" style="padding: 4px 8px; font-size: 10px; background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--line); margin-right: 4px;">1001</button>
+                    <button type="button" class="btn" onclick="quickTestNumber('2005')" style="padding: 4px 8px; font-size: 10px; background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--line); margin-right: 4px;">2005</button>
+                    <button type="button" class="btn" onclick="quickTestNumber('9999')" style="padding: 4px 8px; font-size: 10px; background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--line);">9999</button>
+                </div>
             </div>
 
             <!-- Tab 3: Manual Control -->
@@ -834,6 +840,10 @@ const char* log_page = R"html(
                 <div class="log-control__row">
                     <input type="text" id="cmdPayload" placeholder='JSON Payload e.g. {"cmd":"clear_display"}'>
                     <button class="btn btn--primary" onclick="sendCmd()" style="padding: 10px 20px; border-radius: 4px;">Send</button>
+                </div>
+                <div class="log-control__row" style="margin-top: 5px; border-top: 1px dashed var(--line); padding-top: 8px;">
+                    <input type="text" id="cmdRawText" placeholder='Raw Text (e.g. "vang 1005" or "1005")' style="flex: 1;">
+                    <button class="btn btn--primary" onclick="sendRawText()" style="padding: 10px 14px; background-color: var(--ok); color: var(--ink);">Display Raw</button>
                 </div>
             </div>
         </div>
@@ -902,6 +912,21 @@ const char* log_page = R"html(
                 }
             });
             sendMqtt(topic, payload, `Sending ticket ${ticket} to LED...`);
+        }
+
+        function quickTestNumber(num) {
+            document.getElementById('ledTicketInput').value = num;
+            sendLedTicket();
+        }
+
+        function sendRawText() {
+            const rawText = document.getElementById('cmdRawText').value.trim();
+            if (!rawText) {
+                alert("Please enter some text or number!");
+                return;
+            }
+            const topic = "qms/display";
+            sendMqtt(topic, rawText, `Sending raw: "${rawText}"...`);
         }
 
         function clearLedDisplay() {

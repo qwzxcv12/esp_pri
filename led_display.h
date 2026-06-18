@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "Arduino.h"
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <U8g2_for_Adafruit_GFX.h>
@@ -408,6 +409,30 @@ inline void led_display_task(void *pvParameters) {
   }
 }
 
+// Task to read commands from Serial/UART
+inline void serial_command_task(void *pvParameters) {
+  char buffer[256];
+  int idx = 0;
+  while (1) {
+    while (Serial.available() > 0) {
+      char c = Serial.read();
+      if (c == '\n' || c == '\r') {
+        if (idx > 0) {
+          buffer[idx] = '\0';
+          // Declare add_device_log extern since it is in mqtt_handler.h
+          extern void add_device_log(const char* format, ...);
+          add_device_log("Serial Command: %s", buffer);
+          processMessage(buffer);
+          idx = 0;
+        }
+      } else if (idx < sizeof(buffer) - 1) {
+        buffer[idx++] = c;
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
 // Main initialization
 inline void setup_led_display() {
   HUB75_I2S_CFG::i2s_pins pins = {R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN, OE_PIN, CLK_PIN};
@@ -434,6 +459,7 @@ inline void setup_led_display() {
   u8g2Fonts.print("LED Ready");
   
   xTaskCreate(led_display_task, "led_display_task", 4096, NULL, 5, NULL);
+  xTaskCreate(serial_command_task, "serial_command_task", 4096, NULL, 5, NULL);
 }
 
 #endif // LED_DISPLAY_H

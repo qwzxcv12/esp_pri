@@ -15,6 +15,7 @@
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "wifi_config_html.h"
+#include "Arduino.h"
 #include "led_display.h"
 #include "mqtt_handler.h"
 
@@ -434,10 +435,43 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
     free(buf);
 
     if (strlen(topic) > 0 && strlen(payload) > 0) {
+        bool local_processed = false;
+        if (strcmp(topic, "qms/display") == 0) {
+            cJSON *root = cJSON_Parse(payload);
+            if (root) {
+                cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
+                if (cmd && cJSON_IsString(cmd)) {
+                    if (strcmp(cmd->valuestring, "display_ticket") == 0) {
+                        cJSON *data = cJSON_GetObjectItem(root, "data");
+                        if (data) {
+                            const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
+                            const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
+                            char disp_msg[128];
+                            snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
+                            processMessage(disp_msg);
+                            local_processed = true;
+                        }
+                    } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
+                        processMessage("clear");
+                        local_processed = true;
+                    }
+                }
+                cJSON_Delete(root);
+            }
+            if (!local_processed) {
+                processMessage(payload);
+                local_processed = true;
+            }
+        }
+
         if (mqtt_client) {
             int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
             add_device_log("Web Publish: Topic='%s', MsgID=%d, Payload='%s'", topic, msg_id, payload);
             httpd_resp_sendstr(req, "SUCCESS");
+            return ESP_OK;
+        } else if (local_processed) {
+            add_device_log("Web Publish (Local Only): Topic='%s', Payload='%s'", topic, payload);
+            httpd_resp_sendstr(req, "SUCCESS (LOCAL ONLY)");
             return ESP_OK;
         } else {
             add_device_log("Web Publish Failed: MQTT client not connected.");
@@ -508,6 +542,10 @@ static httpd_handle_t start_webserver(void)
 
 extern "C" void app_main(void)
 {
+    // Initialize Arduino Core
+    initArduino();
+    Serial.begin(115200);
+
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
