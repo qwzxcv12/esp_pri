@@ -779,22 +779,22 @@ const char* log_page = R"html(
         <!-- Ô nhập lệnh gửi trực tiếp -->
         <div class="log-control">
             <div style="display: flex; border-bottom: 1px solid var(--line); margin-bottom: 6px; gap: 8px;">
-                <button type="button" class="tab-btn active" id="tabKioskBtn" onclick="switchControlTab('kiosk')">Kiosk Sim (Mô Phỏng Kiosk)</button>
-                <button type="button" class="tab-btn" id="tabManualBtn" onclick="switchControlTab('manual')">Manual Publish (Thủ Công)</button>
+                <button type="button" class="tab-btn active" id="tabKioskBtn" onclick="switchControlTab('kiosk')">Kiosk Sim</button>
+                <button type="button" class="tab-btn" id="tabManualBtn" onclick="switchControlTab('manual')">Manual Publish</button>
                 <span id="kioskStatus" style="margin-left: auto; font-family: var(--mono); font-size: 11px; align-self: center; color: var(--muted);">Ready</span>
             </div>
 
             <!-- Tab 1: Kiosk Simulator -->
             <div id="kioskControlPanel" style="display: flex; flex-direction: column; gap: 10px;">
                 <div class="log-control__row">
-                    <button class="btn btn--primary" onclick="syncServices()" style="padding: 10px 14px; background-color: var(--accent); color: var(--ink);">📡 1. Đồng bộ dịch vụ</button>
+                    <button class="btn btn--primary" onclick="syncServices()" style="padding: 10px 14px; background-color: var(--accent); color: var(--ink);">📡 1. Sync Services</button>
                     <select id="kioskServiceSelect" style="flex: 1;">
-                        <option value="">-- Vui lòng click Đồng bộ dịch vụ --</option>
+                        <option value="">-- Please click Sync Services --</option>
                     </select>
                 </div>
                 <div class="log-control__row">
-                    <input type="text" id="kioskCustName" placeholder="Tên khách hàng (Mặc định: Khách vãng lai)" style="flex: 1;">
-                    <button class="btn btn--primary" onclick="getTicket()" style="padding: 10px 20px; background-color: var(--ok); color: var(--ink);">🎫 2. Lấy số thứ tự</button>
+                    <input type="text" id="kioskCustName" placeholder="Customer Name (Default: Guest)" style="flex: 1;">
+                    <button class="btn btn--primary" onclick="getTicket()" style="padding: 10px 20px; background-color: var(--ok); color: var(--ink);">🎫 2. Get Ticket</button>
                 </div>
             </div>
 
@@ -853,7 +853,7 @@ const char* log_page = R"html(
 
         function syncServices() {
             if (!devId || !devKey) {
-                alert("Lỗi: Device ID hoặc Device KEY chưa được cấu hình!");
+                alert("Error: Device ID or Device KEY not configured!");
                 return;
             }
             const topic = `qms/sender/${devId}/request`;
@@ -861,25 +861,25 @@ const char* log_page = R"html(
                 cmd: "get_config",
                 secret_key: devKey
             });
-            sendMqtt(topic, payload, "Đang đồng bộ dịch vụ...");
+            sendMqtt(topic, payload, "Syncing services...");
         }
 
         function getTicket() {
             const select = document.getElementById('kioskServiceSelect');
             const serviceId = select.value;
             if (!serviceId) {
-                alert("Vui lòng chọn hoặc đồng bộ dịch vụ!");
+                alert("Please select or sync services first!");
                 return;
             }
             
-            const custName = document.getElementById('kioskCustName').value.trim() || "Khách vãng lai";
+            const custName = document.getElementById('kioskCustName').value.trim() || "Guest";
             const topic = `qms/sender/${devId}/ticket_request`;
             const payload = JSON.stringify({
                 service_id: parseInt(serviceId),
                 secret_key: devKey,
                 customer_name: custName
             });
-            sendMqtt(topic, payload, `Đang gửi yêu cầu lấy số cho dịch vụ ID ${serviceId}...`);
+            sendMqtt(topic, payload, `Requesting ticket for service ID ${serviceId}...`);
         }
 
         function sendMqtt(topic, payload, pendingMsg) {
@@ -895,24 +895,23 @@ const char* log_page = R"html(
             })
             .then(res => {
                 if (res.ok) {
-                    statusBox.textContent = "Gửi thành công!";
+                    statusBox.textContent = "Sent successfully!";
                     statusBox.style.color = 'var(--ok)';
                     setTimeout(fetchLogs, 500);
                 } else {
                     res.text().then(err => {
-                        statusBox.textContent = "Gửi lỗi: " + err;
+                        statusBox.textContent = "Send error: " + err;
                         statusBox.style.color = '#ff6b6b';
                     });
                 }
             })
             .catch(err => {
-                statusBox.textContent = "Lỗi kết nối: " + err;
+                statusBox.textContent = "Connection error: " + err;
                 statusBox.style.color = '#ff6b6b';
             });
         }
 
         function parseServicesFromLog(logData) {
-            // Tìm các JSON init_config
             const regex = /Payload:\s*(\{.*"cmd"\s*:\s*"init_config".*\})/g;
             let match;
             let lastJson = null;
@@ -937,7 +936,7 @@ const char* log_page = R"html(
             servicesList = services;
             const currentValue = select.value;
             
-            select.innerHTML = '<option value="">-- Chọn dịch vụ --</option>';
+            select.innerHTML = '<option value="">-- Select Service --</option>';
             services.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.id;
@@ -950,7 +949,7 @@ const char* log_page = R"html(
             }
             
             const statusBox = document.getElementById('kioskStatus');
-            statusBox.textContent = `Đã đồng bộ ${services.length} dịch vụ!`;
+            statusBox.textContent = `Synced ${services.length} services!`;
             statusBox.style.color = 'var(--ok)';
         }
 
