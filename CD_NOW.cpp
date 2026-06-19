@@ -263,12 +263,16 @@ bool parse_url_param(const char* body, const char* key, char* dst, size_t dst_ma
     const char* end = strchr(ptr, '&');
     size_t len = end ? (size_t)(end - ptr) : strlen(ptr);
     
-    char raw[1024];
-    if (len >= sizeof(raw)) len = sizeof(raw) - 1;
+    char* raw = (char*)malloc(len + 1);
+    if (!raw) {
+        dst[0] = '\0';
+        return false;
+    }
     strncpy(raw, ptr, len);
     raw[len] = '\0';
     
     url_decode(dst, raw, dst_max);
+    free(raw);
     return true;
 }
 
@@ -284,19 +288,29 @@ std::string replace_placeholder(std::string str, const std::string& placeholder,
 
 static bool is_authorized(httpd_req_t *req)
 {
-    char cookie_buf[512] = {0};
-    esp_err_t err = httpd_req_get_hdr_value_str(req, "Cookie", cookie_buf, sizeof(cookie_buf));
+    size_t hdr_len = httpd_req_get_hdr_value_len(req, "Cookie");
+    if (hdr_len == 0) {
+        return false;
+    }
+    char* cookie_buf = (char*)malloc(hdr_len + 1);
+    if (!cookie_buf) {
+        return false;
+    }
+    esp_err_t err = httpd_req_get_hdr_value_str(req, "Cookie", cookie_buf, hdr_len + 1);
+    bool authorized = false;
     if (err == ESP_OK) {
         if (strstr(cookie_buf, "passwd=thien1991") != NULL) {
-            return true;
+            authorized = true;
+        } else {
+            ESP_LOGI(TAG, "Cookie found but password not matched: %s", cookie_buf);
         }
-        ESP_LOGI(TAG, "Cookie found but password not matched: %s", cookie_buf);
     } else {
         if (err != ESP_ERR_NOT_FOUND) {
             ESP_LOGI(TAG, "Cookie header error: %d", err);
         }
     }
-    return false;
+    free(cookie_buf);
+    return authorized;
 }
 
 static esp_err_t root_get_handler(httpd_req_t *req)
@@ -304,7 +318,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     if (!is_authorized(req)) {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_sendstr(req, "Redirecting...");
         return ESP_OK;
     }
     char ssid[64] = {0};
@@ -439,7 +453,7 @@ static esp_err_t log_get_handler(httpd_req_t *req)
     if (!is_authorized(req)) {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_sendstr(req, "Redirecting...");
         return ESP_OK;
     }
     std::string html = log_page;
@@ -454,7 +468,7 @@ static esp_err_t control_get_handler(httpd_req_t *req)
     if (!is_authorized(req)) {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_sendstr(req, "Redirecting...");
         return ESP_OK;
     }
     extern const char* control_page;
@@ -623,13 +637,13 @@ static esp_err_t login_post_handler(httpd_req_t *req)
         httpd_resp_set_hdr(req, "Set-Cookie", "passwd=thien1991; Path=/");
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_sendstr(req, "Redirecting...");
         return ESP_OK;
     } else {
         ESP_LOGI(TAG, "Login failed! Redirecting to /login?error=1");
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login?error=1");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_sendstr(req, "Redirecting...");
         return ESP_OK;
     }
 }
