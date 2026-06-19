@@ -89,11 +89,36 @@ struct TextSegment {
 // Font selection
 inline const uint8_t* VIETNAMESE_FONT = u8g2_font_unifont_t_vietnamese1;
 
+// Helper function to check if the string is a ticket code (like BH-001, KH-0002, A-12, etc.)
+inline bool isTicketCode(const char* text) {
+  int len = strlen(text);
+  if (len == 0 || len > 12) return false;
+  
+  for (int i = 0; text[i] != '\0'; i++) {
+    char c = text[i];
+    // Exclude non-ASCII characters immediately
+    if (c < 32 || c > 126) {
+      return false;
+    }
+    // Allow basic alphanumeric characters, '-', '+', '.', and space
+    if (!isalnum((unsigned char)c) && c != '-' && c != '+' && c != '.' && c != ' ') {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Analyze content type
 inline ContentType analyzeContentType(const char* text) {
   if (strstr(text, "IP:") != nullptr || strstr(text, "WiFi") != nullptr || strstr(text, "AP:") != nullptr) {
     return ONLY_TEXT;
   }
+  
+  // If it's a short alphanumeric ticket code (like BH-001), render it completely in the large font
+  if (isTicketCode(text)) {
+    return ONLY_NUMBERS;
+  }
+
   bool hasDigits = false;
   bool hasNonDigits = false;
   
