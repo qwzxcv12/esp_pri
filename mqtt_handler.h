@@ -136,6 +136,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 add_device_log("Payload: %s", json_buf);
 
                 cJSON *root = cJSON_Parse(json_buf);
+                bool processed = false;
                 if (root) {
                     cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
                     if (cmd && cJSON_IsString(cmd)) {
@@ -145,7 +146,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
                                 const char *counter = cJSON_GetStringValue(cJSON_GetObjectItem(data, "counter"));
                                 const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
+                                const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+
+                                extern void processMessage(const char* command);
+                                char disp_msg[128];
+                                snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
+                                processMessage(disp_msg);
+                                processed = true;
+
                                 if (cust_name) {
                                     add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s, Customer=%s", 
                                         ticket ? ticket : "N/A", 
@@ -160,12 +169,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 }
                             }
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
+                            extern void processMessage(const char* command);
+                            processMessage("clear");
                             add_device_log(">>> COMMAND: Clear screen");
+                            processed = true;
                         }
                     }
                     cJSON_Delete(root);
                 } else {
                     add_device_log("Warning: Failed to parse JSON");
+                }
+                if (!processed && strlen(json_buf) > 0) {
+                    extern void processMessage(const char* command);
+                    processMessage(json_buf);
                 }
                 free(json_buf);
             }
