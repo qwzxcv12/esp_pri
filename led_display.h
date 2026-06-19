@@ -358,6 +358,7 @@ inline void updateDisplay() {
       }
     }
     
+    bool splitSuccess = false;
     if (breakPos > 0) {
       char firstLine[125]; 
       strncpy(firstLine, textToDisplay, breakPos);
@@ -367,13 +368,18 @@ inline void updateDisplay() {
       int width1 = u8g2Fonts.getUTF8Width(firstLine);
       int width2 = u8g2Fonts.getUTF8Width(&textToDisplay[breakPos+1]);
       
-      u8g2Fonts.setForegroundColor(textColor);
-      u8g2Fonts.setCursor((PANEL_RES_X - width1) / 2, PANEL_RES_Y / 2 - 5);
-      u8g2Fonts.print(firstLine);
-      
-      u8g2Fonts.setCursor((PANEL_RES_X - width2) / 2, PANEL_RES_Y / 2 + 10);
-      u8g2Fonts.print(&textToDisplay[breakPos+1]);
-    } else {
+      if (width1 <= PANEL_RES_X && width2 <= PANEL_RES_X) {
+        u8g2Fonts.setForegroundColor(textColor);
+        u8g2Fonts.setCursor((PANEL_RES_X - width1) / 2, PANEL_RES_Y / 2 - 5);
+        u8g2Fonts.print(firstLine);
+        
+        u8g2Fonts.setCursor((PANEL_RES_X - width2) / 2, PANEL_RES_Y / 2 + 10);
+        u8g2Fonts.print(&textToDisplay[breakPos+1]);
+        splitSuccess = true;
+      }
+    }
+    
+    if (!splitSuccess) {
       isScrolling = true;
       scrollPosition = -PANEL_RES_X;
       updateScrollingText();

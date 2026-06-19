@@ -21,6 +21,8 @@
 
 static const char *TAG = "wifi_manager";
 
+static void startup_display_timeout_task(void *pvParameters);
+
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
@@ -208,6 +210,13 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             char buf[64];
             snprintf(buf, sizeof(buf), "xanh IP: %s", ip_str);
             processMessage(buf);
+            
+            // Start the 30-second timer to clear the startup messages now that we got the IP!
+            static bool timer_started = false;
+            if (!timer_started) {
+                xTaskCreate(startup_display_timeout_task, "display_timeout", 2048, NULL, 5, NULL);
+                timer_started = true;
+            }
         }
     }
 }
@@ -719,7 +728,6 @@ extern "C" void app_main(void)
 
     // Initialize LED Display
     setup_led_display();
-    xTaskCreate(startup_display_timeout_task, "display_timeout", 2048, NULL, 5, NULL);
 
     // Initialize Network and Events
     ESP_ERROR_CHECK(esp_netif_init());
@@ -821,6 +829,8 @@ extern "C" void app_main(void)
         add_device_log("Starting Access Point and Captive Portal...");
         if (show_startup_messages) {
             processMessage("vang AP: Config WiFi");
+            // Start the 30-second timer to clear the startup messages in AP mode
+            xTaskCreate(startup_display_timeout_task, "display_timeout", 2048, NULL, 5, NULL);
         }
         
         esp_wifi_stop();
