@@ -15,8 +15,6 @@
 #include "esp_http_server.h"
 #include "esp_system.h"
 #include "wifi_config_html.h"
-#include "Arduino.h"
-#include "led_display.h"
 #include "mqtt_handler.h"
 
 static const char *TAG = "wifi_manager";
@@ -196,13 +194,17 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-// Helper function to decode URL-encoded string
-void url_decode(char *dst, const char *src) {
+// Helper function to decode URL-encoded string safely
+void url_decode(char *dst, const char *src, size_t dst_max) {
+    if (dst_max == 0) return;
     char a = 0, b = 0;
-    while (*src) {
+    size_t written = 0;
+    while (*src && (written < dst_max - 1)) {
         if ((*src == '%') &&
-            ((a = src[1]) && (b = src[2])) &&
-            (isxdigit((unsigned char)a) && isxdigit((unsigned char)b))) {
+            (src[1] && src[2]) &&
+            (isxdigit((unsigned char)src[1]) && isxdigit((unsigned char)src[2]))) {
+            a = src[1];
+            b = src[2];
             if (a >= 'a') a -= 'a'-'A';
             if (a >= 'A') a -= ('A' - 10);
             else a -= '0';
@@ -217,23 +219,12 @@ void url_decode(char *dst, const char *src) {
         } else {
             *dst++ = *src++;
         }
+        written++;
     }
     *dst = '\0';
 }
 
-// Web Server Handlers (html_page is imported from wifi_config_html.h)
-
-// Helper function to replace placeholders in a string
-std::string replace_placeholder(std::string str, const std::string& placeholder, const std::string& replacement) {
-    size_t pos = 0;
-    while ((pos = str.find(placeholder, pos)) != std::string::npos) {
-        str.replace(pos, placeholder.length(), replacement);
-        pos += replacement.length();
-    }
-    return str;
-}
-
-// Helper function to extract and decode a URL parameter
+// Helper function to extract and decode a URL parameter safely
 bool parse_url_param(const char* body, const char* key, char* dst, size_t dst_max) {
     char key_eq[64];
     snprintf(key_eq, sizeof(key_eq), "%s=", key);
@@ -245,15 +236,24 @@ bool parse_url_param(const char* body, const char* key, char* dst, size_t dst_ma
     ptr += strlen(key_eq);
     const char* end = strchr(ptr, '&');
     size_t len = end ? (size_t)(end - ptr) : strlen(ptr);
-    if (len >= dst_max * 3) {
-        len = dst_max * 3 - 1;
-    }
+    
     char raw[1024];
     if (len >= sizeof(raw)) len = sizeof(raw) - 1;
     strncpy(raw, ptr, len);
     raw[len] = '\0';
-    url_decode(dst, raw);
+    
+    url_decode(dst, raw, dst_max);
     return true;
+}
+
+// Helper function to replace placeholders in a string
+std::string replace_placeholder(std::string str, const std::string& placeholder, const std::string& replacement) {
+    size_t pos = 0;
+    while ((pos = str.find(placeholder, pos)) != std::string::npos) {
+        str.replace(pos, placeholder.length(), replacement);
+        pos += replacement.length();
+    }
+    return str;
 }
 
 static esp_err_t root_get_handler(httpd_req_t *req)
@@ -435,43 +435,10 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
     free(buf);
 
     if (strlen(topic) > 0 && strlen(payload) > 0) {
-        bool local_processed = false;
-        if (strcmp(topic, "qms/display") == 0) {
-            cJSON *root = cJSON_Parse(payload);
-            if (root) {
-                cJSON *cmd = cJSON_GetObjectItem(root, "cmd");
-                if (cmd && cJSON_IsString(cmd)) {
-                    if (strcmp(cmd->valuestring, "display_ticket") == 0) {
-                        cJSON *data = cJSON_GetObjectItem(root, "data");
-                        if (data) {
-                            const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
-                            const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
-                            char disp_msg[128];
-                            snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
-                            processMessage(disp_msg);
-                            local_processed = true;
-                        }
-                    } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
-                        processMessage("clear");
-                        local_processed = true;
-                    }
-                }
-                cJSON_Delete(root);
-            }
-            if (!local_processed) {
-                processMessage(payload);
-                local_processed = true;
-            }
-        }
-
         if (mqtt_client) {
             int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
             add_device_log("Web Publish: Topic='%s', MsgID=%d, Payload='%s'", topic, msg_id, payload);
             httpd_resp_sendstr(req, "SUCCESS");
-            return ESP_OK;
-        } else if (local_processed) {
-            add_device_log("Web Publish (Local Only): Topic='%s', Payload='%s'", topic, payload);
-            httpd_resp_sendstr(req, "SUCCESS (LOCAL ONLY)");
             return ESP_OK;
         } else {
             add_device_log("Web Publish Failed: MQTT client not connected.");
@@ -542,9 +509,6 @@ static httpd_handle_t start_webserver(void)
 
 extern "C" void app_main(void)
 {
-    // Initialize Arduino Core
-    initArduino();
-
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -554,9 +518,6 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "NVS Storage Initialized");
-
-    // Initialize LED Display
-    setup_led_display();
 
     // Initialize Network and Events
     ESP_ERROR_CHECK(esp_netif_init());
@@ -601,6 +562,12 @@ extern "C" void app_main(void)
     read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass), mqtt_topic, sizeof(mqtt_topic));
     read_ws_config(ws_url, sizeof(ws_url));
     read_dev_credentials(dev_id, sizeof(dev_id), dev_key, sizeof(dev_key));
+
+    // Copy dev credentials to globals immediately so they are available in AP and Station modes
+    strncpy(g_dev_id, dev_id, sizeof(g_dev_id) - 1);
+    strncpy(g_dev_key, dev_key, sizeof(g_dev_key) - 1);
+    g_dev_id[sizeof(g_dev_id) - 1] = '\0';
+    g_dev_key[sizeof(g_dev_key) - 1] = '\0';
 
     add_device_log("---------------------------------------------");
     add_device_log("Loaded Device Configurations from NVS:");
@@ -673,14 +640,8 @@ extern "C" void app_main(void)
         add_device_log("Starting Web Server in Station mode...");
         start_webserver();
 
-
-
         // Start MQTT client if broker is configured
         if (strlen(mqtt_server) > 0) {
-            // Copy dev credentials to globals for MQTT tasks
-            strncpy(g_dev_id, dev_id, sizeof(g_dev_id) - 1);
-            strncpy(g_dev_key, dev_key, sizeof(g_dev_key) - 1);
-
             int port = 1883;
             if (strlen(mqtt_port) > 0) {
                 port = atoi(mqtt_port);
