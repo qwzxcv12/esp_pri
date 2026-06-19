@@ -5,6 +5,7 @@ const char* html_page = R"html(
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Device Setup</title>
     <style>
@@ -550,6 +551,7 @@ const char* log_page = R"html(
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device System Logs</title>
     <style>
@@ -963,10 +965,10 @@ const char* log_page = R"html(
                     cmd: "display_ticket",
                     data: {
                         ticket: "BH-003",
-                        service: "Cấp thẻ Bảo hiểm y tế",
-                        counter: "Quầy số 03",
+                        service: "Card Issuance",
+                        counter: "Counter 03",
                         status: "CALLING",
-                        cust_name: "Nguyễn Văn A"
+                        cust_name: "John Doe"
                     }
                 });
             } else if (select.value === 'clear') {
@@ -1009,6 +1011,7 @@ const char* control_page = R"html(
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LED Matrix Control</title>
     <style>
@@ -1346,7 +1349,7 @@ const char* control_page = R"html(
                 
                 <div class="field">
                     <label for="ledText">Text to Display</label>
-                    <input type="text" id="ledText" placeholder="Enter custom message..." value="Xin chào">
+                    <input type="text" id="ledText" placeholder="Enter custom message..." value="Welcome">
                 </div>
 
                 <div class="field">
@@ -1354,35 +1357,35 @@ const char* control_page = R"html(
                     <div class="color-grid">
                         <div class="color-btn active" onclick="selectColor('do')" id="color_do">
                             <div class="color-dot" style="background: #ff4d4d;"></div>
-                            <span class="color-label">Đỏ</span>
+                            <span class="color-label">Red</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('xanh')" id="color_xanh">
                             <div class="color-dot" style="background: #4dff4d;"></div>
-                            <span class="color-label">Lá</span>
+                            <span class="color-label">Green</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('lam')" id="color_lam">
                             <div class="color-dot" style="background: #4d4dff;"></div>
-                            <span class="color-label">Dương</span>
+                            <span class="color-label">Blue</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('vang')" id="color_vang">
                             <div class="color-dot" style="background: #ffff4d;"></div>
-                            <span class="color-label">Vàng</span>
+                            <span class="color-label">Yellow</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('tim')" id="color_tim">
                             <div class="color-dot" style="background: #d94dff;"></div>
-                            <span class="color-label">Tím</span>
+                            <span class="color-label">Purple</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('cam')" id="color_cam">
                             <div class="color-dot" style="background: #ff944d;"></div>
-                            <span class="color-label">Cam</span>
+                            <span class="color-label">Orange</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('hong')" id="color_hong">
                             <div class="color-dot" style="background: #ff4da6;"></div>
-                            <span class="color-label">Hồng</span>
+                            <span class="color-label">Pink</span>
                         </div>
                         <div class="color-btn" onclick="selectColor('trang')" id="color_trang">
                             <div class="color-dot" style="background: #ffffff;"></div>
-                            <span class="color-label">Trắng</span>
+                            <span class="color-label">White</span>
                         </div>
                     </div>
                 </div>
@@ -1394,21 +1397,21 @@ const char* control_page = R"html(
                     <span class="section__label">Quick Presets</span>
                 </div>
                 <div class="presets-grid">
-                    <button type="button" class="preset-btn" onclick="applyPreset('Xin kính chào quý khách', 'trang')">
-                        <span>Xin kính chào quý khách</span>
-                        <span class="preset-badge" style="color:#ffffff;">TRẮNG</span>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Welcome Customers', 'trang')">
+                        <span>Welcome Customers</span>
+                        <span class="preset-badge" style="color:#ffffff;">WHITE</span>
                     </button>
-                    <button type="button" class="preset-btn" onclick="applyPreset('Hân hạnh được phục vụ', 'cam')">
-                        <span>Hân hạnh được phục vụ</span>
-                        <span class="preset-badge" style="color:#ff944d;">CAM</span>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Happy to Serve You', 'cam')">
+                        <span>Happy to Serve You</span>
+                        <span class="preset-badge" style="color:#ff944d;">ORANGE</span>
                     </button>
-                    <button type="button" class="preset-btn" onclick="applyPreset('Cảm ơn quý khách', 'xanh')">
-                        <span>Cảm ơn quý khách</span>
-                        <span class="preset-badge" style="color:#4dff4d;">LÁ</span>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Thank You Very Much', 'xanh')">
+                        <span>Thank You Very Much</span>
+                        <span class="preset-badge" style="color:#4dff4d;">GREEN</span>
                     </button>
-                    <button type="button" class="preset-btn" onclick="applyPreset('Quầy tạm ngưng phục vụ', 'do')">
-                        <span>Quầy tạm ngưng phục vụ</span>
-                        <span class="preset-badge" style="color:#ff4d4d;">ĐỎ</span>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Counter Closed', 'do')">
+                        <span>Counter Closed</span>
+                        <span class="preset-badge" style="color:#ff4d4d;">RED</span>
                     </button>
                 </div>
             </div>
