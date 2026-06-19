@@ -89,11 +89,12 @@ struct TextSegment {
 
 // Font selection
 inline const uint8_t* VIETNAMESE_FONT = u8g2_font_unifont_t_vietnamese1;
+inline const uint8_t* LARGE_TICKET_FONT = u8g2_font_fub25_tr; // Free Universal Bold 25px - big, clean for LED matrix
 
 enum SelectedFontType {
-  FONT_SANS_12_BOLD,
-  FONT_SANS_9_BOLD,
-  FONT_U8G2_VIETNAMESE
+  FONT_U8G2_LARGE,    // u8g2_font_fub25_tr for short codes (<=4 chars)
+  FONT_SANS_9_BOLD,   // FreeSansBold9pt7b for medium codes (5-6 chars)
+  FONT_U8G2_VIETNAMESE // u8g2_font_unifont for long codes (>=7 chars)
 };
 
 inline SelectedFontType getFontForTicketCode(const char* text, int16_t* yOffset, int* calculatedWidth) {
@@ -107,7 +108,16 @@ inline SelectedFontType getFontForTicketCode(const char* text, int16_t* yOffset,
   int16_t x1, y1;
   uint16_t w, h;
   
-  // 1. For length <= 6 (e.g. 124, A-12, BH-001): Use FreeSansBold9pt7b (best fit for 32px panel)
+  // 1. For length <= 4 (e.g. 124, A-12): Use large u8g2 font (FUB 25px)
+  if (len <= 4) {
+    u8g2Fonts.setFont(LARGE_TICKET_FONT);
+    int width = u8g2Fonts.getUTF8Width(text);
+    *yOffset = PANEL_RES_Y - 3; // baseline near bottom for 25px font on 32px panel
+    *calculatedWidth = width;
+    return FONT_U8G2_LARGE;
+  }
+  
+  // 2. For length 5-6 (e.g. BH-001, BH-005): Use FreeSansBold9pt7b
   if (len <= 6) {
     dma_display->setFont(&FreeSansBold9pt7b);
     dma_display->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
@@ -116,7 +126,7 @@ inline SelectedFontType getFontForTicketCode(const char* text, int16_t* yOffset,
     return FONT_SANS_9_BOLD;
   }
   
-  // 2. For length >= 7 (e.g. BH-0001, KH-0002): Fallback to Vietnamese font (u8g2)
+  // 3. For length >= 7 (e.g. BH-0001, KH-0002): Fallback to Vietnamese font (u8g2)
   u8g2Fonts.setFont(VIETNAMESE_FONT);
   int width = u8g2Fonts.getUTF8Width(text);
   *yOffset = PANEL_RES_Y / 2 + 6; // yPos baseline for Vietnamese font
@@ -235,10 +245,11 @@ inline void updateScrollingText() {
     int16_t bestY = yPos;
     int calculatedW = 0;
     SelectedFontType selectedFont = getFontForTicketCode(textToDisplay, &bestY, &calculatedW);
-    if (selectedFont == FONT_SANS_12_BOLD) {
-      dma_display->setFont(&FreeSansBold12pt7b);
-      dma_display->setCursor(-scrollPosition, bestY);
-      dma_display->print(textToDisplay);
+    if (selectedFont == FONT_U8G2_LARGE) {
+      u8g2Fonts.setFont(LARGE_TICKET_FONT);
+      u8g2Fonts.setForegroundColor(textColor);
+      u8g2Fonts.setCursor(-scrollPosition, bestY);
+      u8g2Fonts.print(textToDisplay);
     } else if (selectedFont == FONT_SANS_9_BOLD) {
       dma_display->setFont(&FreeSansBold9pt7b);
       dma_display->setCursor(-scrollPosition, bestY);
@@ -367,10 +378,11 @@ inline void updateDisplay() {
     
     if (currentContentType == ONLY_NUMBERS) {
       dma_display->setTextColor(textColor);
-      if (selectedFont == FONT_SANS_12_BOLD) {
-        dma_display->setFont(&FreeSansBold12pt7b);
-        dma_display->setCursor(xPos, yPos);
-        dma_display->print(textToDisplay);
+      if (selectedFont == FONT_U8G2_LARGE) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT);
+        u8g2Fonts.setForegroundColor(textColor);
+        u8g2Fonts.setCursor(xPos, yPos);
+        u8g2Fonts.print(textToDisplay);
       } else if (selectedFont == FONT_SANS_9_BOLD) {
         dma_display->setFont(&FreeSansBold9pt7b);
         dma_display->setCursor(xPos, yPos);
@@ -395,10 +407,11 @@ inline void updateDisplay() {
     
     if (currentContentType == ONLY_NUMBERS) {
       dma_display->setTextColor(textColor);
-      if (selectedFont == FONT_SANS_12_BOLD) {
-        dma_display->setFont(&FreeSansBold12pt7b);
-        dma_display->setCursor(xPos, yPos);
-        dma_display->print(textToDisplay);
+      if (selectedFont == FONT_U8G2_LARGE) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT);
+        u8g2Fonts.setForegroundColor(textColor);
+        u8g2Fonts.setCursor(xPos, yPos);
+        u8g2Fonts.print(textToDisplay);
       } else if (selectedFont == FONT_SANS_9_BOLD) {
         dma_display->setFont(&FreeSansBold9pt7b);
         dma_display->setCursor(xPos, yPos);
