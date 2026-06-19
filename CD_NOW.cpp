@@ -610,7 +610,7 @@ static esp_err_t login_post_handler(httpd_req_t *req)
     free(buf);
 
     if (strcmp(password, "thien1991") == 0) {
-        httpd_resp_set_hdr(req, "Set-Cookie", "passwd=thien1991; Path=/; Max-Age=86400");
+        httpd_resp_set_hdr(req, "Set-Cookie", "passwd=thien1991; Path=/");
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/");
         httpd_resp_send(req, NULL, 0);

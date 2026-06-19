@@ -542,6 +542,25 @@ const char* html_page = R"html(
         });
 
         renderTopics();
+
+        // 15-minute Inactivity Auto Logout
+        (function() {
+            let timeout;
+            const idleTime = 15 * 60 * 1000;
+            function logout() {
+                document.cookie = "passwd=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                window.location.href = "/login";
+            }
+            function resetTimer() {
+                clearTimeout(timeout);
+                timeout = setTimeout(logout, idleTime);
+            }
+            window.onload = resetTimer;
+            document.onmousemove = resetTimer;
+            document.onkeydown = resetTimer;
+            document.onclick = resetTimer;
+            document.onscroll = resetTimer;
+        })();
     </script>
 </body>
 </html>
@@ -1002,6 +1021,25 @@ const char* log_page = R"html(
         
         fetchLogs();
         setInterval(fetchLogs, 5000);
+
+        // 15-minute Inactivity Auto Logout
+        (function() {
+            let timeout;
+            const idleTime = 15 * 60 * 1000;
+            function logout() {
+                document.cookie = "passwd=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                window.location.href = "/login";
+            }
+            function resetTimer() {
+                clearTimeout(timeout);
+                timeout = setTimeout(logout, idleTime);
+            }
+            window.onload = resetTimer;
+            document.onmousemove = resetTimer;
+            document.onkeydown = resetTimer;
+            document.onclick = resetTimer;
+            document.onscroll = resetTimer;
+        })();
     </script>
 </body>
 </html>
@@ -1494,6 +1532,25 @@ const char* control_page = R"html(
                 showStatus('Connection error: ' + err, 'error');
             });
         }
+
+        // 15-minute Inactivity Auto Logout
+        (function() {
+            let timeout;
+            const idleTime = 15 * 60 * 1000;
+            function logout() {
+                document.cookie = "passwd=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                window.location.href = "/login";
+            }
+            function resetTimer() {
+                clearTimeout(timeout);
+                timeout = setTimeout(logout, idleTime);
+            }
+            window.onload = resetTimer;
+            document.onmousemove = resetTimer;
+            document.onkeydown = resetTimer;
+            document.onclick = resetTimer;
+            document.onscroll = resetTimer;
+        })();
     </script>
 </body>
 </html>
