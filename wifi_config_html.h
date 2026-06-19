@@ -358,6 +358,7 @@ const char* html_page = R"html(
 
         <div class="panel__nav">
             <a href="/" class="nav-item active">Configuration</a>
+            <a href="/control" class="nav-item">LED Control</a>
             <a href="/log" class="nav-item">System Logs</a>
         </div>
 
@@ -771,6 +772,7 @@ const char* log_page = R"html(
 
         <div class="panel__nav">
             <a href="/" class="nav-item">Configuration</a>
+            <a href="/control" class="nav-item">LED Control</a>
             <a href="/log" class="nav-item active">System Logs</a>
         </div>
 
@@ -998,6 +1000,497 @@ const char* log_page = R"html(
         
         fetchLogs();
         setInterval(fetchLogs, 5000);
+    </script>
+</body>
+</html>
+)html";
+
+const char* control_page = R"html(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Matrix Control</title>
+    <style>
+        :root {
+            --ink: #0b0f14;
+            --panel: #11161d;
+            --line: #232b35;
+            --text: #e6edf3;
+            --muted: #6b7785;
+            --accent: #ffb454;
+            --accent-dim: rgba(255, 180, 84, 0.16);
+            --ok: #5ec98f;
+            --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            --sans: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: var(--sans);
+            background-color: var(--ink);
+            background-image:
+                linear-gradient(90deg, rgba(255, 180, 84, 0.04) 1px, transparent 1px),
+                linear-gradient(rgba(255, 180, 84, 0.04) 1px, transparent 1px),
+                radial-gradient(circle, rgba(255, 180, 84, 0.12) 1.4px, transparent 1.4px);
+            background-size: 56px 56px, 56px 56px, 56px 56px;
+            background-position: 0 0, 0 0, 28px 28px;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px 0;
+        }
+        .panel {
+            width: 440px;
+            max-width: 95%;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-top: 2px solid var(--accent);
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+        }
+        .panel__header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 22px 24px 18px;
+            border-bottom: 1px solid var(--line);
+        }
+        .chip-icon {
+            flex: none;
+            width: 30px;
+            height: 30px;
+            color: var(--accent);
+            margin-top: 2px;
+        }
+        .panel__heading {
+            flex: 1;
+            min-width: 0;
+        }
+        h2 {
+            margin: 2px 0 6px;
+            font-size: 19px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .subtitle {
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: var(--muted);
+            margin: 0;
+        }
+        
+        /* Navigation Bar */
+        .panel__nav {
+            display: flex;
+            border-bottom: 1px solid var(--line);
+            background: rgba(0, 0, 0, 0.25);
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 14px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            text-decoration: none;
+            transition: all 0.15s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-item:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .nav-item.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .content {
+            padding: 4px 24px 24px;
+        }
+        .section {
+            padding-top: 20px;
+        }
+        .section__title {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .section__index {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent);
+        }
+        .section__label {
+            flex: none;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+        .section__title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--line);
+        }
+        .field {
+            margin-bottom: 16px;
+        }
+        .field label {
+            display: block;
+            margin-bottom: 6px;
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            color: var(--muted);
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            font-family: var(--mono);
+            font-size: 13.5px;
+            color: var(--text);
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .color-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .color-btn:hover {
+            border-color: var(--accent);
+        }
+        .color-btn.active {
+            border-color: var(--accent);
+            background: rgba(255, 180, 84, 0.1);
+            box-shadow: 0 0 8px rgba(255, 180, 84, 0.15);
+        }
+        .color-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-bottom: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .color-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+        .color-btn.active .color-label {
+            color: var(--text);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+        }
+        .btn {
+            flex: 1;
+            padding: 13px;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.05s ease;
+            text-align: center;
+        }
+        .btn--primary {
+            color: var(--ink);
+            background: var(--accent);
+        }
+        .btn--primary:hover { background: #ffc578; }
+        .btn--primary:active { transform: translateY(1px); }
+
+        .btn--secondary {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--line);
+        }
+        .btn--secondary:hover { background: rgba(255, 255, 255, 0.08); }
+        .btn--secondary:active { transform: translateY(1px); }
+
+        .presets-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .preset-btn {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--sans);
+            font-size: 12px;
+            color: var(--text);
+            text-align: left;
+            transition: all 0.15s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .preset-btn:hover {
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .preset-badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.06);
+            color: var(--muted);
+            border: 1px solid var(--line);
+        }
+
+        .status-bar {
+            font-family: var(--mono);
+            font-size: 11px;
+            padding: 10px 12px;
+            border-radius: 5px;
+            margin-top: 16px;
+            display: none;
+            text-align: center;
+        }
+        .status-bar.success {
+            display: block;
+            background: rgba(94, 201, 143, 0.1);
+            border: 1px solid var(--ok);
+            color: var(--ok);
+        }
+        .status-bar.error {
+            display: block;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .footnote {
+            margin-top: 20px;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <div class="panel__header">
+            <svg class="chip-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="9" y="9" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+                <rect x="13" y="13" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M9 13H4M9 19H4M28 13H23M28 19H23M13 9V4M19 9V4M13 28V23M19 28V23" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <div class="panel__heading">
+                <h2>LED Matrix Control</h2>
+                <p class="subtitle">Directly control what is shown on the display.</p>
+            </div>
+        </div>
+
+        <div class="panel__nav">
+            <a href="/" class="nav-item">Configuration</a>
+            <a href="/control" class="nav-item active">LED Control</a>
+            <a href="/log" class="nav-item">System Logs</a>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <div class="section__title">
+                    <span class="section__index">01</span>
+                    <span class="section__label">Message Config</span>
+                </div>
+                
+                <div class="field">
+                    <label for="ledText">Text to Display</label>
+                    <input type="text" id="ledText" placeholder="Enter custom message..." value="Xin chào">
+                </div>
+
+                <div class="field">
+                    <label>Text Color</label>
+                    <div class="color-grid">
+                        <div class="color-btn active" onclick="selectColor('do')" id="color_do">
+                            <div class="color-dot" style="background: #ff4d4d;"></div>
+                            <span class="color-label">Đỏ</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('xanh')" id="color_xanh">
+                            <div class="color-dot" style="background: #4dff4d;"></div>
+                            <span class="color-label">Lá</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('lam')" id="color_lam">
+                            <div class="color-dot" style="background: #4d4dff;"></div>
+                            <span class="color-label">Dương</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('vang')" id="color_vang">
+                            <div class="color-dot" style="background: #ffff4d;"></div>
+                            <span class="color-label">Vàng</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('tim')" id="color_tim">
+                            <div class="color-dot" style="background: #d94dff;"></div>
+                            <span class="color-label">Tím</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('cam')" id="color_cam">
+                            <div class="color-dot" style="background: #ff944d;"></div>
+                            <span class="color-label">Cam</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('hong')" id="color_hong">
+                            <div class="color-dot" style="background: #ff4da6;"></div>
+                            <span class="color-label">Hồng</span>
+                        </div>
+                        <div class="color-btn" onclick="selectColor('trang')" id="color_trang">
+                            <div class="color-dot" style="background: #ffffff;"></div>
+                            <span class="color-label">Trắng</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__title">
+                    <span class="section__index">02</span>
+                    <span class="section__label">Quick Presets</span>
+                </div>
+                <div class="presets-grid">
+                    <button type="button" class="preset-btn" onclick="applyPreset('Xin kính chào quý khách', 'trang')">
+                        <span>Xin kính chào quý khách</span>
+                        <span class="preset-badge" style="color:#ffffff;">TRẮNG</span>
+                    </button>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Hân hạnh được phục vụ', 'cam')">
+                        <span>Hân hạnh được phục vụ</span>
+                        <span class="preset-badge" style="color:#ff944d;">CAM</span>
+                    </button>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Cảm ơn quý khách', 'xanh')">
+                        <span>Cảm ơn quý khách</span>
+                        <span class="preset-badge" style="color:#4dff4d;">LÁ</span>
+                    </button>
+                    <button type="button" class="preset-btn" onclick="applyPreset('Quầy tạm ngưng phục vụ', 'do')">
+                        <span>Quầy tạm ngưng phục vụ</span>
+                        <span class="preset-badge" style="color:#ff4d4d;">ĐỎ</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="statusBar" class="status-bar"></div>
+
+            <div class="btn-row">
+                <button type="button" class="btn btn--secondary" onclick="clearDisplay()">Clear Screen</button>
+                <button type="button" class="btn btn--primary" onclick="sendMessage()">Send to LED</button>
+            </div>
+            
+            <div class="footnote">
+                Commands are processed instantly by the LED matrix display.<br>
+                <strong>Antigravity ESP-IDF Manager</strong>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedColor = 'do';
+
+        function selectColor(color) {
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById('color_' + color).classList.add('active');
+            selectedColor = color;
+        }
+
+        function applyPreset(text, color) {
+            document.getElementById('ledText').value = text;
+            selectColor(color);
+        }
+
+        function clearDisplay() {
+            document.getElementById('ledText').value = '';
+            sendPublish('qms/display', 'clear_display');
+        }
+
+        function sendMessage() {
+            const text = document.getElementById('ledText').value.trim();
+            if (!text) {
+                showStatus('Error: Please enter some text to display!', 'error');
+                return;
+            }
+            const command = `${selectedColor} ${text}`;
+            sendPublish('qms/display', command);
+        }
+
+        function showStatus(message, type) {
+            const bar = document.getElementById('statusBar');
+            bar.className = 'status-bar ' + type;
+            bar.textContent = message;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    bar.style.display = 'none';
+                }, 4000);
+            }
+        }
+
+        function sendPublish(topic, payload) {
+            const params = `topic=${encodeURIComponent(topic)}&payload=${encodeURIComponent(payload)}`;
+            
+            fetch('/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            })
+            .then(res => {
+                if (res.ok) {
+                    showStatus('Message successfully sent to LED!', 'success');
+                } else {
+                    res.text().then(err => {
+                        showStatus('Failed to send: ' + err, 'error');
+                    });
+                }
+            })
+            .catch(err => {
+                showStatus('Connection error: ' + err, 'error');
+            });
+        }
     </script>
 </body>
 </html>

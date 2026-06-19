@@ -392,6 +392,13 @@ static esp_err_t log_get_handler(httpd_req_t *req)
     return httpd_resp_send(req, html.c_str(), html.length());
 }
 
+static esp_err_t control_get_handler(httpd_req_t *req)
+{
+    extern const char* control_page;
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, control_page, strlen(control_page));
+}
+
 static esp_err_t log_data_get_handler(httpd_req_t *req)
 {
     std::string all_logs = "";
@@ -518,6 +525,14 @@ static httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &log_get);
+
+        httpd_uri_t control_get = {
+            .uri       = "/control",
+            .method    = HTTP_GET,
+            .handler   = control_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &control_get);
 
         httpd_uri_t log_data_get = {
             .uri       = "/log_data",
