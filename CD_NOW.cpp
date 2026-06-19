@@ -296,7 +296,7 @@ static bool is_authorized(httpd_req_t *req)
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) {
-        httpd_resp_set_status(req, "307 Temporary Redirect");
+        httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
         httpd_resp_send(req, NULL, 0);
         return ESP_OK;
@@ -431,7 +431,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
 static esp_err_t log_get_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) {
-        httpd_resp_set_status(req, "307 Temporary Redirect");
+        httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
         httpd_resp_send(req, NULL, 0);
         return ESP_OK;
@@ -446,7 +446,7 @@ static esp_err_t log_get_handler(httpd_req_t *req)
 static esp_err_t control_get_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) {
-        httpd_resp_set_status(req, "307 Temporary Redirect");
+        httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login");
         httpd_resp_send(req, NULL, 0);
         return ESP_OK;
@@ -611,12 +611,12 @@ static esp_err_t login_post_handler(httpd_req_t *req)
 
     if (strcmp(password, "thien1991") == 0) {
         httpd_resp_set_hdr(req, "Set-Cookie", "passwd=thien1991; Path=/; Max-Age=86400");
-        httpd_resp_set_status(req, "307 Temporary Redirect");
+        httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/");
         httpd_resp_send(req, NULL, 0);
         return ESP_OK;
     } else {
-        httpd_resp_set_status(req, "307 Temporary Redirect");
+        httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", "/login?error=1");
         httpd_resp_send(req, NULL, 0);
         return ESP_OK;
