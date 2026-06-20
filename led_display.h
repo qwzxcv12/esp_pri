@@ -89,10 +89,12 @@ struct TextSegment {
 
 // Font selection
 inline const uint8_t* VIETNAMESE_FONT = u8g2_font_unifont_t_vietnamese1;
-inline const uint8_t* LARGE_TICKET_FONT = u8g2_font_fub25_tr; // Free Universal Bold 25px - big, clean for LED matrix
+inline const uint8_t* LARGE_TICKET_FONT_3 = u8g2_font_fub25_tr; // 25px for <=3 chars
+inline const uint8_t* LARGE_TICKET_FONT_4 = u8g2_font_fub20_tr; // 20px for 4 chars
 
 enum SelectedFontType {
-  FONT_U8G2_LARGE,    // u8g2_font_fub25_tr for short codes (<=4 chars)
+  FONT_U8G2_LARGE_3,  // short codes (<=3 chars)
+  FONT_U8G2_LARGE_4,  // short codes (4 chars)
   FONT_SANS_9_BOLD,   // FreeSansBold9pt7b for medium codes (5-6 chars)
   FONT_U8G2_VIETNAMESE // u8g2_font_unifont for long codes (>=7 chars)
 };
@@ -108,13 +110,22 @@ inline SelectedFontType getFontForTicketCode(const char* text, int16_t* yOffset,
   int16_t x1, y1;
   uint16_t w, h;
   
-  // 1. For length <= 4 (e.g. 124, A-12): Use large u8g2 font (FUB 25px)
-  if (len <= 4) {
-    u8g2Fonts.setFont(LARGE_TICKET_FONT);
+  // 1a. For length <= 3 (e.g. 124): Use large u8g2 font (FUB 25px)
+  if (len <= 3) {
+    u8g2Fonts.setFont(LARGE_TICKET_FONT_3);
     int width = u8g2Fonts.getUTF8Width(text);
     *yOffset = PANEL_RES_Y - 3; // baseline near bottom for 25px font on 32px panel
     *calculatedWidth = width;
-    return FONT_U8G2_LARGE;
+    return FONT_U8G2_LARGE_3;
+  }
+  
+  // 1b. For length == 4 (e.g. A-12): Use medium-large u8g2 font (FUB 20px)
+  if (len == 4) {
+    u8g2Fonts.setFont(LARGE_TICKET_FONT_4);
+    int width = u8g2Fonts.getUTF8Width(text);
+    *yOffset = PANEL_RES_Y - 5; // baseline near bottom for 20px font
+    *calculatedWidth = width;
+    return FONT_U8G2_LARGE_4;
   }
   
   // 2. For length 5-6 (e.g. BH-001, BH-005): Use FreeSansBold9pt7b
@@ -245,8 +256,13 @@ inline void updateScrollingText() {
     int16_t bestY = yPos;
     int calculatedW = 0;
     SelectedFontType selectedFont = getFontForTicketCode(textToDisplay, &bestY, &calculatedW);
-    if (selectedFont == FONT_U8G2_LARGE) {
-      u8g2Fonts.setFont(LARGE_TICKET_FONT);
+    if (selectedFont == FONT_U8G2_LARGE_3) {
+      u8g2Fonts.setFont(LARGE_TICKET_FONT_3);
+      u8g2Fonts.setForegroundColor(textColor);
+      u8g2Fonts.setCursor(-scrollPosition, bestY);
+      u8g2Fonts.print(textToDisplay);
+    } else if (selectedFont == FONT_U8G2_LARGE_4) {
+      u8g2Fonts.setFont(LARGE_TICKET_FONT_4);
       u8g2Fonts.setForegroundColor(textColor);
       u8g2Fonts.setCursor(-scrollPosition, bestY);
       u8g2Fonts.print(textToDisplay);
@@ -378,8 +394,13 @@ inline void updateDisplay() {
     
     if (currentContentType == ONLY_NUMBERS) {
       dma_display->setTextColor(textColor);
-      if (selectedFont == FONT_U8G2_LARGE) {
-        u8g2Fonts.setFont(LARGE_TICKET_FONT);
+      if (selectedFont == FONT_U8G2_LARGE_3) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT_3);
+        u8g2Fonts.setForegroundColor(textColor);
+        u8g2Fonts.setCursor(xPos, yPos);
+        u8g2Fonts.print(textToDisplay);
+      } else if (selectedFont == FONT_U8G2_LARGE_4) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT_4);
         u8g2Fonts.setForegroundColor(textColor);
         u8g2Fonts.setCursor(xPos, yPos);
         u8g2Fonts.print(textToDisplay);
@@ -407,8 +428,13 @@ inline void updateDisplay() {
     
     if (currentContentType == ONLY_NUMBERS) {
       dma_display->setTextColor(textColor);
-      if (selectedFont == FONT_U8G2_LARGE) {
-        u8g2Fonts.setFont(LARGE_TICKET_FONT);
+      if (selectedFont == FONT_U8G2_LARGE_3) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT_3);
+        u8g2Fonts.setForegroundColor(textColor);
+        u8g2Fonts.setCursor(xPos, yPos);
+        u8g2Fonts.print(textToDisplay);
+      } else if (selectedFont == FONT_U8G2_LARGE_4) {
+        u8g2Fonts.setFont(LARGE_TICKET_FONT_4);
         u8g2Fonts.setForegroundColor(textColor);
         u8g2Fonts.setCursor(xPos, yPos);
         u8g2Fonts.print(textToDisplay);
