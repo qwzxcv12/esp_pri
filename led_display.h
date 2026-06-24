@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "Arduino.h"
+#include <mutex>
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <U8g2_for_Adafruit_GFX.h>
@@ -53,6 +54,9 @@ inline int scrollPosition = 0;
 inline unsigned long lastScrollTime = 0;
 inline int scrollDelay = 50;  
 inline int textWidth = 0;
+
+// Mutex for display variables thread-safety
+inline std::mutex display_mutex;
 
 // Text content type
 enum ContentType {
@@ -313,6 +317,7 @@ inline void updateScrollingText() {
 
 // Process received display command
 inline void processMessage(const char* command) {
+  std::lock_guard<std::mutex> lock(display_mutex);
   if (strcmp(command, "clear") == 0 || strcmp(command, "clear_display") == 0 || strlen(command) == 0) {
     strcpy(textToDisplay, "");
     if (dma_display) dma_display->clearScreen();
@@ -546,11 +551,14 @@ inline void handleScrolling() {
 // Task loop for LED scanning and scrolling
 inline void led_display_task(void *pvParameters) {
   while (1) {
-    if (needRedraw) {
-      updateDisplay();
-      needRedraw = false;
+    {
+      std::lock_guard<std::mutex> lock(display_mutex);
+      if (needRedraw) {
+        updateDisplay();
+        needRedraw = false;
+      }
+      handleScrolling();
     }
-    handleScrolling();
     vTaskDelay(pdMS_TO_TICKS(20)); 
   }
 }

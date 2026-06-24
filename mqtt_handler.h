@@ -55,6 +55,8 @@ inline void add_device_log(const char* format, ...) {
     ESP_LOGI(MQTT_TAG, "%s", log_buf);
 }
 
+#include "audio_player.h"
+
 inline void clean_broker_host(char* dst, const char* src, size_t dst_len) {
     const char* start = src;
     const char* proto_end = strstr(src, "://");
@@ -174,6 +176,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
                                 processMessage(disp_msg);
                                 processed = true;
+
+                                const char *action = cJSON_GetStringValue(cJSON_GetObjectItem(data, "action"));
+                                char speech_text[128] = {0};
+                                if (action && strcmp(action, "recall") == 0) {
+                                    snprintf(speech_text, sizeof(speech_text), "Mời lại số %s đến %s", ticket ? ticket : "", counter ? counter : "");
+                                } else {
+                                    snprintf(speech_text, sizeof(speech_text), "Mời số %s đến %s", ticket ? ticket : "", counter ? counter : "");
+                                }
+
+                                tts_request_t *tts_req = (tts_request_t*)malloc(sizeof(tts_request_t));
+                                if (tts_req) {
+                                    strncpy(tts_req->text, speech_text, sizeof(tts_req->text) - 1);
+                                    tts_req->text[sizeof(tts_req->text) - 1] = '\0';
+                                    xTaskCreate(play_tts_task, "play_tts_task", 8192, tts_req, 5, NULL);
+                                }
 
                                 if (cust_name) {
                                     add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s, Customer=%s", 

@@ -18,6 +18,7 @@
 #include "Arduino.h"
 #include "led_display.h"
 #include "mqtt_handler.h"
+#include "audio_player.h"
 
 static const char *TAG = "wifi_manager";
 
@@ -488,6 +489,11 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         return ESP_OK;
     }
     int remaining = req->content_len;
+    if (remaining <= 0 || remaining > 4096) {
+        ESP_LOGE(TAG, "POST content length invalid or too large: %d", remaining);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_FAIL;
+    }
     char *buf = (char*)malloc(remaining + 1);
     if (!buf) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
@@ -625,6 +631,11 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
         return ESP_OK;
     }
     int remaining = req->content_len;
+    if (remaining <= 0 || remaining > 2048) {
+        ESP_LOGE(TAG, "POST content length invalid or too large: %d", remaining);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_FAIL;
+    }
     char *buf = (char*)malloc(remaining + 1);
     if (!buf) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
@@ -735,6 +746,11 @@ static esp_err_t login_post_handler(httpd_req_t *req)
 {
     int remaining = req->content_len;
     ESP_LOGI(TAG, "Login POST received. Content-Length: %d", remaining);
+    if (remaining <= 0 || remaining > 512) {
+        ESP_LOGE(TAG, "POST content length invalid or too large: %d", remaining);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_FAIL;
+    }
     char *buf = (char*)malloc(remaining + 1);
     if (!buf) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
@@ -886,6 +902,9 @@ extern "C" void app_main(void)
 {
     // Initialize Arduino Core
     initArduino();
+
+    // Initialize I2S Audio Speaker
+    init_i2s_audio();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
