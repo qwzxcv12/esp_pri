@@ -567,21 +567,7 @@ static esp_err_t log_get_handler(httpd_req_t *req)
     return send_log_template_chunked(req, log_page, g_dev_id, g_dev_key);
 }
 
-static esp_err_t control_get_handler(httpd_req_t *req)
-{
-    if (!is_authorized(req)) {
-        httpd_resp_set_status(req, "302 Found");
-        httpd_resp_set_hdr(req, "Location", "/login");
-        httpd_resp_sendstr(req, "Redirecting...");
-        return ESP_OK;
-    }
-    extern const char* control_page;
-    httpd_resp_set_type(req, "text/html");
-    httpd_resp_set_hdr(req, "Connection", "close");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-    httpd_resp_set_hdr(req, "Pragma", "no-cache");
-    return httpd_resp_send(req, control_page, strlen(control_page));
-}
+
 
 static esp_err_t log_data_get_handler(httpd_req_t *req)
 {
@@ -822,13 +808,7 @@ static httpd_handle_t start_webserver(void)
         };
         httpd_register_uri_handler(server, &log_get);
 
-        httpd_uri_t control_get = {
-            .uri       = "/control",
-            .method    = HTTP_GET,
-            .handler   = control_get_handler,
-            .user_ctx  = NULL
-        };
-        httpd_register_uri_handler(server, &control_get);
+
 
         httpd_uri_t log_data_get = {
             .uri       = "/log_data",
