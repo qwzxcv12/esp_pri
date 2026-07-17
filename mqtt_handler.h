@@ -23,6 +23,7 @@ inline esp_mqtt_client_handle_t mqtt_client = NULL;
 inline char g_dev_id[128] = {0};
 inline char g_dev_key[128] = {0};
 inline char g_mqtt_topic[256] = {0};
+inline char g_mqtt_server_host[128] = {0};
 
 typedef struct {
     int id;
@@ -288,6 +289,8 @@ inline void mqtt_app_start(const char* broker, int port, const char* user, const
 {
     char clean_host[128] = {0};
     clean_broker_host(clean_host, broker, sizeof(clean_host));
+    strncpy(g_mqtt_server_host, clean_host, sizeof(g_mqtt_server_host) - 1);
+    g_mqtt_server_host[sizeof(g_mqtt_server_host) - 1] = '\0';
     
     // Copy topic to global variable for subscribe when connected
     strncpy(g_mqtt_topic, topic, sizeof(g_mqtt_topic) - 1);
