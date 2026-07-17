@@ -938,14 +938,16 @@ const char* log_page = R"html(
 
             const regex = /Nhấn phím \d+:\s*(.*?)\s*\(Service ID:\s*(\d+)\)/g;
             let match;
-            let services = [];
+            let serviceMap = new Map();
             
             while ((match = regex.exec(logData)) !== null) {
-                services.push({
-                    name: match[1],
-                    id: parseInt(match[2])
-                });
+                serviceMap.set(parseInt(match[2]), match[1]);
             }
+            
+            let services = [];
+            serviceMap.forEach((name, id) => {
+                services.push({ name: name, id: id });
+            });
             
             if (services.length > 0) {
                 updateServiceDropdown(services);
@@ -1350,13 +1352,28 @@ const char* gpio_page = R"html(
         
         .mapping-item {
             display: flex;
-            gap: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
             padding: 10px;
             background: rgba(255,255,255,0.02);
             border: 1px solid var(--line);
             border-radius: 5px;
             margin-bottom: 10px;
             align-items: center;
+        }
+        .mapping-item select {
+            min-width: 0;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 12px; }
+            .mapping-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .mapping-item select { flex: unset; width: 100%; }
+            .mapping-item .btn--danger { align-self: flex-end; }
+            .nav-item { padding: 10px 6px; font-size: 10px; letter-spacing: 0.5px; }
+            .row { flex-wrap: wrap; }
         }
     </style>
 </head>
