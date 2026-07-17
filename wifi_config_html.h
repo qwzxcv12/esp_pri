@@ -1427,8 +1427,7 @@ const char* gpio_page = R"html(
             </div>
             
             <div id="mappingContainer">
-                <div style="text-align: center; color: var(--muted); padding: 24px 16px;
-            overflow-y: scroll;">Loading configuration...</div>
+                <div style="text-align: center; color: var(--muted); padding: 24px 0;">Loading configuration...</div>
             </div>
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
@@ -1558,8 +1557,7 @@ const char* gpio_page = R"html(
             container.innerHTML = '';
             
             if (currentMappings.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 24px 16px;
-            overflow-y: scroll;">No buttons mapped.</div>';
+                container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 24px 0;">No buttons mapped.</div>';
                 return;
             }
             
