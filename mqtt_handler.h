@@ -111,7 +111,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                     int msg_id1 = esp_mqtt_client_subscribe(client, token, 1);
                     add_device_log("Subscribed to base: %s (msg_id=%d)", token, msg_id1);
                     
-                    // Subscribe to device command topic
                     if (strlen(g_dev_id) > 0) {
                         char dev_topic[320];
                         snprintf(dev_topic, sizeof(dev_topic), "%s/%s/command", token, g_dev_id);
@@ -120,6 +119,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                     }
                 }
                 token = strtok(NULL, ",");
+            }
+            
+            // Also explicitly subscribe to qms/sender/.../command because backend hardcodes it for Kiosk config
+            if (strlen(g_dev_id) > 0) {
+                char sender_topic[320];
+                snprintf(sender_topic, sizeof(sender_topic), "qms/sender/%s/command", g_dev_id);
+                int msg_id_sender = esp_mqtt_client_subscribe(client, sender_topic, 1);
+                add_device_log("Subscribed to sender cmd: %s (msg_id=%d)", sender_topic, msg_id_sender);
             }
         }
         
