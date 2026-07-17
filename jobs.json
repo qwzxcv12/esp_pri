@@ -1,0 +1,105 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 87805163908,
+      "run_id": 29555003826,
+      "workflow_name": "Build ESP32 Firmware",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/qwzxcv12/esp_pri/actions/runs/29555003826",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOS_4aTc8AAAAUcZh5hA",
+      "head_sha": "a54b6a0f6c83d6995abaa3509bc82487daebf409",
+      "url": "https://api.github.com/repos/qwzxcv12/esp_pri/actions/jobs/87805163908",
+      "html_url": "https://github.com/qwzxcv12/esp_pri/actions/runs/29555003826/job/87805163908",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-07-17T04:30:07Z",
+      "started_at": "2026-07-17T04:30:10Z",
+      "completed_at": "2026-07-17T04:33:02Z",
+      "name": "build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-07-17T04:30:11Z",
+          "completed_at": "2026-07-17T04:30:12Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-07-17T04:30:12Z",
+          "completed_at": "2026-07-17T04:31:08Z"
+        },
+        {
+          "name": "Checkout Code",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-07-17T04:31:08Z",
+          "completed_at": "2026-07-17T04:31:09Z"
+        },
+        {
+          "name": "Reconstruct ESP-IDF Project Structure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-07-17T04:31:09Z",
+          "completed_at": "2026-07-17T04:31:11Z"
+        },
+        {
+          "name": "Build Firmware",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 5,
+          "started_at": "2026-07-17T04:31:11Z",
+          "completed_at": "2026-07-17T04:32:59Z"
+        },
+        {
+          "name": "Upload Firmware Artifacts",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-07-17T04:32:59Z",
+          "completed_at": "2026-07-17T04:32:59Z"
+        },
+        {
+          "name": "Post Checkout Code",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-07-17T04:32:59Z",
+          "completed_at": "2026-07-17T04:32:59Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-07-17T04:32:59Z",
+          "completed_at": "2026-07-17T04:33:00Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-07-17T04:33:00Z",
+          "completed_at": "2026-07-17T04:33:00Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/qwzxcv12/esp_pri/check-runs/87805163908",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000396,
+      "runner_name": "GitHub Actions 1000000396",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

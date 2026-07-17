@@ -119,6 +119,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 }
                 token = strtok(NULL, ",");
             }
+        }
+        
         // Request config after subscription
         if (strlen(g_dev_id) > 0) {
             char req_topic[320];
