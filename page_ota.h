@@ -10,21 +10,27 @@ const char* ota_page = R"=====(
     <title>Firmware Update - PRI_QMS</title>
     <style>
         :root {
-            --bg: #0f172a;
-            --panel: #1e293b;
-            --text: #f8fafc;
-            --muted: #94a3b8;
-            --accent: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --line: #334155;
-            --input: #0f172a;
-            --mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --ink: #0b0f14;
+            --panel: #11161d;
+            --line: #232b35;
+            --text: #e6edf3;
+            --muted: #6b7785;
+            --accent: #ffb454;
+            --accent-dim: rgba(255, 180, 84, 0.16);
+            --ok: #5ec98f;
+            --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            --sans: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg);
+            font-family: var(--sans);
+            background-color: var(--ink);
+            background-image:
+                linear-gradient(90deg, rgba(255, 180, 84, 0.04) 1px, transparent 1px),
+                linear-gradient(rgba(255, 180, 84, 0.04) 1px, transparent 1px),
+                radial-gradient(circle, rgba(255, 180, 84, 0.12) 1.4px, transparent 1.4px);
+            background-size: 56px 56px, 56px 56px, 56px 56px;
+            background-position: 0 0, 0 0, 28px 28px;
             color: var(--text);
             display: flex;
             justify-content: center;
@@ -32,6 +38,7 @@ const char* ota_page = R"=====(
             min-height: 100vh;
             margin: 0;
             padding: 24px 16px;
+            overflow-y: scroll;
         }
         .panel {
             width: 540px;
@@ -40,20 +47,88 @@ const char* ota_page = R"=====(
             border: 1px solid var(--line);
             border-top: 2px solid var(--accent);
             border-radius: 8px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
         }
         .panel__header {
             display: flex;
             align-items: center;
+            gap: 12px;
             height: 85px;
             flex: none;
             padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
-        h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text); }
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #ff8f00);
+            padding: 8px;
+            color: var(--ink);
+            box-shadow: 0 4px 12px var(--accent-dim);
+        }
+        .title-wrap {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h2 {
+            margin: 0 0 4px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.2;
+        }
+        .panel__heading {
+            flex: 1;
+            min-width: 0;
+        }
+        .device-id {
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+        h2 {
+            margin: 2px 0 6px;
+            font-size: 19px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .subtitle {
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: var(--muted);
+            margin: 0;
+        }
+        .status {
+            flex: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            letter-spacing: 1px;
+            color: var(--ok);
+            white-space: nowrap;
+            padding-top: 3px;
+        }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--ok);
+            box-shadow: 0 0 6px rgba(94, 201, 143, 0.8);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.35; }
+        }
+        
+        /* Navigation Bar */
         .panel__nav {
             display: flex;
             border-bottom: 1px solid var(--line);
@@ -68,15 +143,65 @@ const char* ota_page = R"=====(
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 1.5px;
             color: var(--muted);
             text-decoration: none;
+            transition: all 0.15s ease;
             border-bottom: 2px solid transparent;
+        }
+        .nav-item:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.02);
         }
         .nav-item.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
             background: rgba(255, 255, 255, 0.04);
         }
+
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 480px) {
+            body { padding: 0; }
+            .panel {
+                max-width: 100%;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+                box-shadow: none;
+                min-height: 100vh;
+            }
+            .panel__header {
+                padding: 0 16px;
+                height: 75px;
+            }
+            .chip-icon { display: none; }
+            .panel__nav {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .panel__nav::-webkit-scrollbar { display: none; }
+            .nav-item {
+                padding: 12px 16px;
+                font-size: 10px;
+                white-space: nowrap;
+                flex: none;
+            }
+            form, .log-container, .container {
+                padding: 16px !important;
+            }
+            .field label { font-size: 10px; }
+            input[type="text"], input[type="password"], input[type="number"], .dropdown-multi__selected, select {
+                font-size: 14px !important; /* Prevent iOS zoom */
+                padding: 12px !important;
+            }
+            .submit, .btn {
+                padding: 14px !important;
+                font-size: 14px !important;
+            }
+        }
+
+
+        
         .container { padding: 32px 24px; text-align: center; }
         .btn {
             background: var(--accent);
@@ -102,8 +227,18 @@ const char* ota_page = R"=====(
 </head>
 <body>
     <div class="panel">
-        <div class="panel__header">
-            <h2>PRI_QMS System</h2>
+                <div class="panel__header">
+            <svg class="chip-icon" style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #ff8f00); padding: 8px; color: var(--ink); box-shadow: 0 4px 12px var(--accent-dim); flex: none;" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="9" y="9" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+                <rect x="13" y="13" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M9 13H4M9 19H4M28 13H23M28 19H23M13 9V4M19 9V4M13 28V23M19 28V23" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <div class="panel__heading">
+                <div class="device-id">ESP32 &middot; SoC</div>
+                <h2>Firmware Update</h2>
+                <p class="subtitle">Update device firmware via OTA.</p>
+            </div>
+            <div class="status"><span class="status-dot"></span>Active</div>
         </div>
         <div class="panel__nav">
             <a href="/" class="nav-item">Configuration</a>
