@@ -98,7 +98,7 @@ static void play_tts_task(void *pvParameters) {
     if (err == ESP_OK) {
         int content_length = esp_http_client_fetch_headers(client);
         int status_code = esp_http_client_get_status_code(client);
-        if (content_length >= 0 || status_code == 200) {
+        if (status_code == 200) {
             add_device_log("TTS: Connected successfully! (Status: %d, Length: %d)", status_code, content_length);
             char buffer[1024];
             int read_bytes;
