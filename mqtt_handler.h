@@ -67,8 +67,6 @@ inline __attribute__((noinline)) void add_device_log(const char* format, ...) {
     free(log_buf);
 }
 
-#include "audio_player.h"
-
 inline void clean_broker_host(char* dst, const char* src, size_t dst_len) {
     const char* start = src;
     const char* proto_end = strstr(src, "://");
