@@ -1381,17 +1381,17 @@ const char* gpio_page = R"html(
                 </select>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+            <div style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
                 <span style="font-weight: bold; color: var(--accent);">BUTTON MAPPINGS</span>
-                <button class="btn" id="syncBtn" onclick="fetchServices(true)">Sync Services</button>
             </div>
             
             <div id="mappingContainer">
                 <div style="text-align: center; color: var(--muted); padding: 20px;">Loading configuration...</div>
             </div>
             
-            <div style="margin-top: 15px;">
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button class="btn" onclick="addMappingRow()">+ Add Button</button>
+                <button class="btn" id="syncBtn" onclick="fetchServices(true)">Sync Services</button>
             </div>
             
             <div style="margin-top: 30px;">

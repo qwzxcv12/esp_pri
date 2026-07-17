@@ -819,7 +819,7 @@ static esp_err_t login_post_handler(httpd_req_t *req)
 static esp_err_t api_services_get_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) return ESP_OK;
-    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Connection", "close");
     
     cJSON *root = cJSON_CreateArray();
@@ -839,7 +839,7 @@ static esp_err_t api_services_get_handler(httpd_req_t *req)
 static esp_err_t api_gpio_config_get_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) return ESP_OK;
-    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Connection", "close");
     
     char saved_json[1024] = {0};
