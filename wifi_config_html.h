@@ -953,18 +953,19 @@ const char* log_page = R"html(
         }
 
         function parseServicesFromLog(logData) {
-            const regex = /Payload:\s*(\{.*"cmd"\s*:\s*"init_config".*\})/g;
+            const regex = /Nhấn phím \d+:\s*(.*?)\s*\(Service ID:\s*(\d+)\)/g;
             let match;
-            let lastJson = null;
+            let services = [];
             
             while ((match = regex.exec(logData)) !== null) {
-                try {
-                    lastJson = JSON.parse(match[1]);
-                } catch(e) {}
+                services.push({
+                    name: match[1],
+                    id: parseInt(match[2])
+                });
             }
             
-            if (lastJson && lastJson.services) {
-                updateServiceDropdown(lastJson.services);
+            if (services.length > 0) {
+                updateServiceDropdown(services);
             }
         }
         
