@@ -6,4 +6,6 @@
 #include "page_login.h"
 #include "page_gpio.h"
 
+#include "page_ota.h"
+
 #endif // WIFI_CONFIG_HTML_H
