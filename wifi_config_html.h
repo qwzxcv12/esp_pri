@@ -364,41 +364,103 @@ const char* html_page = R"html(
 
         
         <form action="/config" method="POST" style="margin-bottom: 24px; background: rgba(0,0,0,0.1); padding: 16px; border-radius: 8px; border: 1px solid var(--line);">
-<div class="section">
-                <div class="section__title">
+            <div class="section">
+<div class="section__title">
                     <span class="section__index">01</span>
                     <span class="section__label">Network</span>
                 </div>
+                <div class="field">
+                    <label for="ssid">Wi-Fi network name (SSID)</label>
+                    <input type="text" id="ssid" name="ssid" required placeholder="Enter Wi-Fi SSID" value="{{SSID}}">
+                </div>
+                <div class="field">
+                    <label for="password">Wi-Fi password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter Wi-Fi password" value="{{PASSWORD}}">
+                </div>
+            </div>
             <input type="hidden" name="config_section" value="NETWORK">
             <button type="submit" class="submit" style="margin-top: 16px;">Save NETWORK</button>
         </form>
 
         <form action="/config" method="POST" style="margin-bottom: 24px; background: rgba(0,0,0,0.1); padding: 16px; border-radius: 8px; border: 1px solid var(--line);">
-<div class="section">
-                <div class="section__title">
+            <div class="section">
+<div class="section__title">
                     <span class="section__index">02</span>
                     <span class="section__label">MQTT Broker</span>
                 </div>
+                <div class="field">
+                    <label for="mqtt_server">Broker host</label>
+                    <input type="text" id="mqtt_server" name="mqtt_server" placeholder="qms1.camdvr.org" value="{{MQTT_SERVER}}">
+                </div>
+                <div class="field">
+                    <label for="mqtt_port">Broker port</label>
+                    <input type="number" id="mqtt_port" name="mqtt_port" placeholder="1993" value="{{MQTT_PORT}}">
+                </div>
+                <div class="field">
+                    <label for="mqtt_user">Broker username</label>
+                    <input type="text" id="mqtt_user" name="mqtt_user" placeholder="thom" value="{{MQTT_USER}}">
+                </div>
+                <div class="field">
+                    <label for="mqtt_pass">Broker password</label>
+                    <input type="password" id="mqtt_pass" name="mqtt_pass" placeholder="301258" value="{{MQTT_PASS}}">
+                </div>
+                
+                <!-- Dropdown Đa Chọn Topic -->
+                <div class="field">
+                    <label>Topics (Select one or more)</label>
+                    <div class="dropdown-multi">
+                        <div class="dropdown-multi__selected" onclick="toggleDropdown(event)">
+                            <span id="selectedTopicsText">Select Topics...</span>
+                            <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                        <div class="dropdown-multi__options" id="dropdownOptions">
+                            <div class="dropdown-multi__list" id="topicsList">
+                                <!-- Option Rendered via JS -->
+                            </div>
+                            <div class="dropdown-multi__add" onclick="event.stopPropagation()">
+                                <input type="text" id="newTopicInput" placeholder="Add custom topic...">
+                                <button type="button" onclick="addCustomTopic(event)">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Hidden input gửi lên Server -->
+                    <input type="hidden" id="mqtt_topic" name="mqtt_topic" value="{{MQTT_TOPIC}}">
+                </div>
+            </div>
             <input type="hidden" name="config_section" value="MQTT">
             <button type="submit" class="submit" style="margin-top: 16px;">Save MQTT</button>
         </form>
 
         <form action="/config" method="POST" style="margin-bottom: 24px; background: rgba(0,0,0,0.1); padding: 16px; border-radius: 8px; border: 1px solid var(--line);">
-<div class="section">
-                <div class="section__title">
+            <div class="section">
+<div class="section__title">
                     <span class="section__index">03</span>
                     <span class="section__label">WebSocket</span>
                 </div>
+                <div class="field">
+                    <label for="ws_url">Socket URL</label>
+                    <input type="text" id="ws_url" name="ws_url" placeholder="e.g. ws://192.168.1.100:81" value="{{WS_URL}}">
+                </div>
+            </div>
             <input type="hidden" name="config_section" value="WS">
             <button type="submit" class="submit" style="margin-top: 16px;">Save WS</button>
         </form>
 
         <form action="/config" method="POST" style="margin-bottom: 24px; background: rgba(0,0,0,0.1); padding: 16px; border-radius: 8px; border: 1px solid var(--line);">
-<div class="section">
-                <div class="section__title">
+            <div class="section">
+<div class="section__title">
                     <span class="section__index">04</span>
                     <span class="section__label">Device Credentials</span>
                 </div>
+                <div class="field">
+                    <label for="dev_id">Device ID</label>
+                    <input type="text" id="dev_id" name="dev_id" placeholder="Device ID" value="{{DEV_ID}}">
+                </div>
+                <div class="field">
+                    <label for="dev_key">Device KEY</label>
+                    <input type="text" id="dev_key" name="dev_key" placeholder="Device KEY" value="{{DEV_KEY}}">
+                </div>
+            </div>
             <input type="hidden" name="config_section" value="DEV">
             <button type="submit" class="submit" style="margin-top: 16px;">Save DEV</button>
         </form>
