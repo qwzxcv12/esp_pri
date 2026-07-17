@@ -40,7 +40,7 @@ const char* html_page = R"html(
             padding: 24px 0;
         }
         .panel {
-            width: 440px;
+            width: 540px;
             max-width: 95%;
             background: var(--panel);
             border: 1px solid var(--line);
@@ -622,8 +622,8 @@ const char* log_page = R"html(
             padding: 20px;
         }
         .panel {
-            width: 700px;
-            max-width: 100%;
+            width: 540px;
+            max-width: 95%;
             background: var(--panel);
             border: 1px solid var(--line);
             border-top: 2px solid var(--accent);
@@ -1235,7 +1235,7 @@ const char* gpio_page = R"html(
             padding: 24px 0;
         }
         .panel {
-            width: 480px;
+            width: 540px;
             max-width: 95%;
             background: var(--panel);
             border: 1px solid var(--line);
