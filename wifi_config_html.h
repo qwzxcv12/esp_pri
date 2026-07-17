@@ -1561,7 +1561,6 @@ const char* gpio_page = R"html(
                 
                 row.innerHTML = `
                     ${srvSelect}
-                    <span style="color:var(--muted); font-size:12px;">➔</span>
                     ${pinSelect}
                     <button class="btn btn--danger" onclick="removeMapping(${index})">X</button>
                 `;
