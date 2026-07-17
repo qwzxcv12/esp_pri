@@ -1383,7 +1383,7 @@ const char* gpio_page = R"html(
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
                 <span style="font-weight: bold; color: var(--accent);">BUTTON MAPPINGS</span>
-                <button class="btn" onclick="fetchServices()">Sync Services</button>
+                <button class="btn" id="syncBtn" onclick="fetchServices(true)">Sync Services</button>
             </div>
             
             <div id="mappingContainer">
@@ -1411,13 +1411,27 @@ const char* gpio_page = R"html(
             await fetchConfig();
         }
 
-        async function fetchServices() {
+        async function fetchServices(triggerMqtt = false) {
             try {
+                if (triggerMqtt) {
+                    document.getElementById('syncBtn').innerText = "Syncing...";
+                    await fetch('/publish', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'cmd=init_config'
+                    });
+                    await new Promise(r => setTimeout(r, 1500));
+                    document.getElementById('syncBtn').innerText = "Sync Services";
+                }
                 const res = await fetch('/api/services');
                 services = await res.json();
+                if (triggerMqtt && services.length === 0) {
+                    alert("Không lấy được danh sách. Hãy kiểm tra kết nối MQTT!");
+                }
                 renderAll();
             } catch (e) {
                 console.error("Failed to fetch services", e);
+                if (triggerMqtt) document.getElementById('syncBtn').innerText = "Sync Services";
             }
         }
         
