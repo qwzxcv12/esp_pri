@@ -1401,6 +1401,8 @@ const char* gpio_page = R"html(
     </div>
 
     <script>
+        const devId = "{{DEV_ID}}";
+        const devKey = "{{DEV_KEY}}";
         const esp32Pins = [13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33];
         const esp32s3Pins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 21, 35, 36, 37, 38, 39, 40, 41, 42, 47, 48];
         let services = [];
@@ -1415,10 +1417,13 @@ const char* gpio_page = R"html(
             try {
                 if (triggerMqtt) {
                     document.getElementById('syncBtn').innerText = "Syncing...";
+                    const topic = `qms/sender/${devId}/request`;
+                    const payload = JSON.stringify({ cmd: "get_config", secret_key: devKey });
+                    const params = `topic=${encodeURIComponent(topic)}&payload=${encodeURIComponent(payload)}`;
                     await fetch('/publish', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'cmd=init_config'
+                        body: params
                     });
                     await new Promise(r => setTimeout(r, 1500));
                     document.getElementById('syncBtn').innerText = "Sync Services";
