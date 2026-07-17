@@ -360,6 +360,7 @@ const char* html_page = R"html(
         <div class="panel__nav">
             <a href="/" class="nav-item active">Configuration</a>
             <a href="/log" class="nav-item">System Logs</a>
+            <a href="/gpio" class="nav-item">GPIO Mapping</a>
         </div>
 
         
@@ -811,6 +812,7 @@ const char* log_page = R"html(
         <div class="panel__nav">
             <a href="/" class="nav-item">Configuration</a>
             <a href="/log" class="nav-item active">System Logs</a>
+            <a href="/gpio" class="nav-item">GPIO Mapping</a>
         </div>
 
         <div class="log-container" id="logBox">Loading device logs...</div>
