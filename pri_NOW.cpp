@@ -959,12 +959,15 @@ static httpd_handle_t s_webserver_handle = NULL;
 static void ota_task(void *pvParameter)
 {
     add_device_log("Starting OTA update from URL: %s", g_ota_url);
-    esp_http_client_config_t config = {};
-    config.url = g_ota_url;
-    config.crt_bundle_attach = esp_crt_bundle_attach;
-    config.keep_alive_enable = true;
+    esp_http_client_config_t client_config = {};
+    client_config.url = g_ota_url;
+    client_config.crt_bundle_attach = esp_crt_bundle_attach;
+    client_config.keep_alive_enable = true;
     
-    esp_err_t ret = esp_https_ota(&config);
+    esp_https_ota_config_t ota_config = {};
+    ota_config.http_config = &client_config;
+    
+    esp_err_t ret = esp_https_ota(&ota_config);
     if (ret == ESP_OK) {
         add_device_log("OTA Update successful! Restarting...");
         vTaskDelay(pdMS_TO_TICKS(2000));
