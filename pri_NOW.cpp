@@ -492,37 +492,54 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
     buf[cur_len] = '\0';
 
-    char ssid[64] = {0};
-    char password[64] = {0};
-    char mqtt_server[64] = {0};
-    char mqtt_port[16] = {0};
-    char mqtt_user[64] = {0};
-    char mqtt_pass[64] = {0};
-    char mqtt_topic[256] = {0};
-    char ws_url[128] = {0};
-    char dev_id[128] = {0};
-    char dev_key[128] = {0};
+    char config_section[32] = {0};
+    parse_url_param(buf, "config_section", config_section, sizeof(config_section));
 
-    parse_url_param(buf, "ssid", ssid, sizeof(ssid));
-    parse_url_param(buf, "password", password, sizeof(password));
-    parse_url_param(buf, "mqtt_server", mqtt_server, sizeof(mqtt_server));
-    parse_url_param(buf, "mqtt_port", mqtt_port, sizeof(mqtt_port));
-    parse_url_param(buf, "mqtt_user", mqtt_user, sizeof(mqtt_user));
-    parse_url_param(buf, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
-    parse_url_param(buf, "mqtt_topic", mqtt_topic, sizeof(mqtt_topic));
-    parse_url_param(buf, "ws_url", ws_url, sizeof(ws_url));
-    parse_url_param(buf, "dev_id", dev_id, sizeof(dev_id));
-    parse_url_param(buf, "dev_key", dev_key, sizeof(dev_key));
+    ESP_LOGI(TAG, "Saving configurations for section: %s", config_section);
+    esp_err_t err = ESP_OK;
+
+    if (strcmp(config_section, "NETWORK") == 0) {
+        char ssid[64] = {0};
+        char password[64] = {0};
+        parse_url_param(buf, "ssid", ssid, sizeof(ssid));
+        parse_url_param(buf, "password", password, sizeof(password));
+        err = save_wifi_credentials(ssid, password);
+        add_device_log("Network configuration saved.");
+    } 
+    else if (strcmp(config_section, "MQTT") == 0) {
+        char mqtt_server[64] = {0};
+        char mqtt_port[16] = {0};
+        char mqtt_user[64] = {0};
+        char mqtt_pass[64] = {0};
+        char mqtt_topic[256] = {0};
+        parse_url_param(buf, "mqtt_server", mqtt_server, sizeof(mqtt_server));
+        parse_url_param(buf, "mqtt_port", mqtt_port, sizeof(mqtt_port));
+        parse_url_param(buf, "mqtt_user", mqtt_user, sizeof(mqtt_user));
+        parse_url_param(buf, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
+        parse_url_param(buf, "mqtt_topic", mqtt_topic, sizeof(mqtt_topic));
+        err = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass, mqtt_topic);
+        add_device_log("MQTT configuration saved.");
+    }
+    else if (strcmp(config_section, "WS") == 0) {
+        char ws_url[128] = {0};
+        parse_url_param(buf, "ws_url", ws_url, sizeof(ws_url));
+        err = save_ws_config(ws_url);
+        add_device_log("WebSocket configuration saved.");
+    }
+    else if (strcmp(config_section, "DEV") == 0) {
+        char dev_id[128] = {0};
+        char dev_key[128] = {0};
+        parse_url_param(buf, "dev_id", dev_id, sizeof(dev_id));
+        parse_url_param(buf, "dev_key", dev_key, sizeof(dev_key));
+        err = save_dev_credentials(dev_id, dev_key);
+        add_device_log("Device credentials saved.");
+    } else {
+        ESP_LOGE(TAG, "Unknown config_section: %s", config_section);
+    }
+    
     free(buf);
 
-    ESP_LOGI(TAG, "Saving configurations...");
-
-    esp_err_t err1 = save_wifi_credentials(ssid, password);
-    esp_err_t err2 = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass, mqtt_topic);
-    esp_err_t err3 = save_ws_config(ws_url);
-    esp_err_t err4 = save_dev_credentials(dev_id, dev_key);
-
-    if (err1 != ESP_OK || err2 != ESP_OK || err3 != ESP_OK || err4 != ESP_OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to save configuration to NVS!");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save configuration");
         return ESP_FAIL;
