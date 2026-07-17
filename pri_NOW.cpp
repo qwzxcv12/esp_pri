@@ -1160,9 +1160,7 @@ extern "C" void app_main(void)
     add_device_log("  Device KEY     : %s", strlen(dev_key) > 0 ? dev_key : "[Not Set]");
     add_device_log("---------------------------------------------");
 
-    strncpy(ssid, "Ze", sizeof(ssid));
-    strncpy(password, "thien1991", sizeof(password));
-    err = ESP_OK;
+
 
     bool connected = false;
     if (err == ESP_OK && strlen(ssid) > 0) {
