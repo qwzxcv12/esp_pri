@@ -70,9 +70,8 @@ static void play_tts_task(void *pvParameters) {
     char post_data[256];
     snprintf(post_data, sizeof(post_data), "{\"text\":\"%s\"}", req_data->text);
 
-    extern char g_mqtt_server_host[128];
-    char tts_url[256];
-    snprintf(tts_url, sizeof(tts_url), "http://%s:5400/api/tts", g_mqtt_server_host);
+    // Hardcoded per user request
+    const char* tts_url = "http://192.168.2.16/api/tts";
 
     esp_http_client_config_t config = {};
     config.url = tts_url;
