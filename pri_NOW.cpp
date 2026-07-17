@@ -862,6 +862,24 @@ static void webserver_timeout_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+static void terminal_task(void *pvParameters) {
+    while (1) {
+        int c = fgetc(stdin);
+        if (c != EOF) {
+            if (c >= '1' && c <= '9') {
+                int index = c - '1';
+                if (index < g_service_count) {
+                    add_device_log("Terminal: Selected service index %d (%s)", index, g_services[index].name);
+                    send_ticket_request_by_service_id(g_services[index].id);
+                } else {
+                    add_device_log("Terminal: Invalid service index %d", index + 1);
+                }
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
 extern "C" void app_main(void)
 {
     // Initialize Arduino Core
@@ -1021,4 +1039,6 @@ extern "C" void app_main(void)
     if (s_webserver_handle != NULL) {
         xTaskCreate(webserver_timeout_task, "webserver_timeout", 2048, NULL, 5, NULL);
     }
+    
+    xTaskCreate(terminal_task, "terminal_task", 4096, NULL, 5, NULL);
 }

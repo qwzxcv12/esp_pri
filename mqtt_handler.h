@@ -24,6 +24,15 @@ inline char g_dev_id[128] = {0};
 inline char g_dev_key[128] = {0};
 inline char g_mqtt_topic[256] = {0};
 
+typedef struct {
+    int id;
+    char name[64];
+    char prefix[16];
+} qms_service_t;
+
+inline qms_service_t g_services[10];
+inline int g_service_count = 0;
+
 static const char *MQTT_TAG = "mqtt_qms";
 
 // Add log helper
@@ -110,6 +119,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 }
                 token = strtok(NULL, ",");
             }
+        // Request config after subscription
+        if (strlen(g_dev_id) > 0) {
+            char req_topic[320];
+            snprintf(req_topic, sizeof(req_topic), "qms/sender/%s/request", g_dev_id);
+            const char* req_payload = "{\"cmd\":\"get_config\"}";
+            int msg_id3 = esp_mqtt_client_publish(client, req_topic, req_payload, 0, 1, 0);
+            add_device_log("Sent get_config request: msg_id=%d", msg_id3);
         }
         break;
 
@@ -185,6 +201,30 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                             add_device_log(">>> COMMAND: Clear screen");
                             processed = true;
+                        } else if (strcmp(cmd->valuestring, "init_config") == 0) {
+                            cJSON *services = cJSON_GetObjectItem(root, "services");
+                            if (services && cJSON_IsArray(services)) {
+                                g_service_count = 0;
+                                int num_services = cJSON_GetArraySize(services);
+                                add_device_log("=== DANH SÁCH DỊCH VỤ ===");
+                                for (int i = 0; i < num_services && i < 10; i++) {
+                                    cJSON *srv = cJSON_GetArrayItem(services, i);
+                                    cJSON *id_json = cJSON_GetObjectItem(srv, "id");
+                                    cJSON *name_json = cJSON_GetObjectItem(srv, "name");
+                                    if (id_json && name_json) {
+                                        g_services[g_service_count].id = id_json->valueint;
+                                        strncpy(g_services[g_service_count].name, name_json->valuestring, sizeof(g_services[g_service_count].name) - 1);
+                                        g_services[g_service_count].name[sizeof(g_services[g_service_count].name) - 1] = '\0';
+                                        
+                                        add_device_log("Nhấn phím %d: %s (Service ID: %d)", g_service_count + 1, g_services[g_service_count].name, g_services[g_service_count].id);
+                                        printf("Nhấn phím %d: %s (Service ID: %d)\n", g_service_count + 1, g_services[g_service_count].name, g_services[g_service_count].id);
+                                        g_service_count++;
+                                    }
+                                }
+                                add_device_log("=========================");
+                                printf("=========================\n");
+                            }
+                            processed = true;
                         }
                     }
                     cJSON_Delete(root);
@@ -259,6 +299,23 @@ inline void mqtt_app_start(const char* broker, int port, const char* user, const
         xTaskCreate(mqtt_heartbeat_task, "mqtt_hb", 4096, NULL, 5, NULL);
     } else {
         add_device_log("Warning: Device credentials not set, Heartbeat disabled.");
+    }
+}
+
+inline void send_ticket_request_by_service_id(int service_id) {
+    if (mqtt_client && strlen(g_dev_id) > 0) {
+        char req_topic[320];
+        snprintf(req_topic, sizeof(req_topic), "qms/sender/%s/ticket_request", g_dev_id);
+        
+        char req_payload[128];
+        snprintf(req_payload, sizeof(req_payload), "{\"service_id\": %d}", service_id);
+        
+        int msg_id = esp_mqtt_client_publish(mqtt_client, req_topic, req_payload, 0, 1, 0);
+        add_device_log("Sent ticket_request (service_id=%d): msg_id=%d", service_id, msg_id);
+        printf("Sent ticket_request (service_id=%d): msg_id=%d\n", service_id, msg_id);
+    } else {
+        add_device_log("Error: MQTT client not ready or device ID empty");
+        printf("Error: MQTT client not ready or device ID empty\n");
     }
 }
 
