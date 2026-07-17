@@ -819,7 +819,6 @@ const char* log_page = R"html(
         <div class="log-control">
             <div style="display: flex; border-bottom: 1px solid var(--line); margin-bottom: 6px; gap: 8px;">
                 <button type="button" class="tab-btn active" id="tabKioskBtn" onclick="switchControlTab('kiosk')">Kiosk Sim</button>
-                <button type="button" class="tab-btn" id="tabManualBtn" onclick="switchControlTab('manual')">Manual Publish</button>
                 <span id="kioskStatus" style="margin-left: auto; font-family: var(--mono); font-size: 11px; align-self: center; color: var(--muted);">Ready</span>
             </div>
 
@@ -840,20 +839,6 @@ const char* log_page = R"html(
                 </div>
             </div>
 
-            <!-- Tab 2: Manual Control -->
-            <div id="manualControlPanel" style="display: none; flex-direction: column; gap: 10px;">
-                <div class="log-control__row">
-                    <input type="text" id="cmdTopic" placeholder="Topic to publish..." style="flex: 1;">
-                    <select id="templateSelect" onchange="applyTemplate()">
-                        <option value="">-- Template --</option>
-                        <option value="call">Call Ticket (BH-003)</option>
-                        <option value="clear">Clear Screen</option>
-                    </select>
-                </div>
-                <div class="log-control__row">
-                    <input type="text" id="cmdPayload" placeholder='JSON Payload e.g. {"cmd":"clear_display"}'>
-                    <button class="btn btn--primary" onclick="sendCmd()" style="padding: 10px 20px; border-radius: 4px;">Send</button>
-                </div>
             </div>
         </div>
 
@@ -878,22 +863,7 @@ const char* log_page = R"html(
         }
 
         function switchControlTab(tab) {
-            const kioskPanel = document.getElementById('kioskControlPanel');
-            const manualPanel = document.getElementById('manualControlPanel');
-            const kioskBtn = document.getElementById('tabKioskBtn');
-            const manualBtn = document.getElementById('tabManualBtn');
-            
-            if (tab === 'kiosk') {
-                kioskPanel.style.display = 'flex';
-                manualPanel.style.display = 'none';
-                kioskBtn.classList.add('active');
-                manualBtn.classList.remove('active');
-            } else {
-                kioskPanel.style.display = 'none';
-                manualPanel.style.display = 'flex';
-                kioskBtn.classList.remove('active');
-                manualBtn.classList.add('active');
-            }
+            // Only kiosk tab exists now
         }
 
         function syncServices() {
@@ -1035,24 +1005,6 @@ const char* log_page = R"html(
             }
         }
 
-        function applyTemplate() {
-            const select = document.getElementById('templateSelect');
-            const payloadInput = document.getElementById('cmdPayload');
-            if (select.value === 'call') {
-                payloadInput.value = JSON.stringify({
-                    cmd: "display_ticket",
-                    data: {
-                        ticket: "BH-003",
-                        service: "Cấp thẻ Bảo hiểm y tế",
-                        counter: "Quầy số 03",
-                        status: "CALLING",
-                        cust_name: "Nguyễn Văn A"
-                    }
-                });
-            } else if (select.value === 'clear') {
-                payloadInput.value = JSON.stringify({ cmd: "clear_display" });
-            }
-        }
 
         function fetchLogs() {
             const logBox = document.getElementById('logBox');
@@ -1068,15 +1020,7 @@ const char* log_page = R"html(
                 });
         }
         
-        function sendCmd() {
-            const topic = document.getElementById('cmdTopic').value.trim();
-            const payload = document.getElementById('cmdPayload').value.trim();
-            if (!topic || !payload) {
-                alert("Please enter both topic and payload.");
-                return;
-            }
-            sendMqtt(topic, payload, "Publishing manually...");
-        }
+
         
         fetchLogs();
         setInterval(fetchLogs, 5000);
