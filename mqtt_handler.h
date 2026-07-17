@@ -22,6 +22,7 @@ inline std::mutex g_log_mutex;
 inline esp_mqtt_client_handle_t mqtt_client = NULL;
 inline char g_dev_id[128] = {0};
 inline char g_dev_key[128] = {0};
+inline char g_ota_url[256] = {0};
 inline char g_mqtt_topic[256] = {0};
 inline char g_mqtt_server_host[128] = {0};
 
@@ -233,6 +234,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 }
                                 add_device_log("=========================");
                                 printf("=========================\n");
+                            }
+                            processed = true;
+                        } else if (strcmp(cmd->valuestring, "update_firmware") == 0) {
+                            cJSON *url_json = cJSON_GetObjectItem(root, "url");
+                            if (url_json && cJSON_IsString(url_json)) {
+                                strncpy(g_ota_url, url_json->valuestring, sizeof(g_ota_url) - 1);
+                                g_ota_url[sizeof(g_ota_url) - 1] = '\0';
+                                add_device_log("====== OTA UPDATE AVAILABLE ======");
+                                add_device_log("URL: %s", g_ota_url);
+                                add_device_log("Vui lòng truy cập trang Web (Tab Firmware Update) để xác nhận cài đặt!");
                             }
                             processed = true;
                         }

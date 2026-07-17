@@ -18,6 +18,8 @@
 #include "Arduino.h"
 #include "mqtt_handler.h"
 #include "driver/gpio.h"
+#include "esp_https_ota.h"
+#include "esp_crt_bundle.h"
 static const char *TAG = "wifi_manager";
 
 
@@ -953,6 +955,56 @@ static void button_task(void *pvParameters) {
 
 static httpd_handle_t s_webserver_handle = NULL;
 
+
+static void ota_task(void *pvParameter)
+{
+    add_device_log("Starting OTA update from URL: %s", g_ota_url);
+    esp_http_client_config_t config = {};
+    config.url = g_ota_url;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.keep_alive_enable = true;
+    
+    esp_err_t ret = esp_https_ota(&config);
+    if (ret == ESP_OK) {
+        add_device_log("OTA Update successful! Restarting...");
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        esp_restart();
+    } else {
+        add_device_log("OTA Update failed! Error: %s", esp_err_to_name(ret));
+    }
+    vTaskDelete(NULL);
+}
+
+static esp_err_t api_ota_start_post_handler(httpd_req_t *req)
+{
+    if (strlen(g_ota_url) == 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No OTA URL available");
+        return ESP_FAIL;
+    }
+    httpd_resp_sendstr(req, "OTA Started");
+    xTaskCreate(&ota_task, "ota_task", 8192, NULL, 5, NULL);
+    return ESP_OK;
+}
+
+static esp_err_t api_ota_check_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    char resp[512];
+    snprintf(resp, sizeof(resp), "{\"url\":\"%s\"}", g_ota_url);
+    httpd_resp_sendstr(req, resp);
+    return ESP_OK;
+}
+
+
+static esp_err_t ota_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_send(req, ota_page, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -1056,6 +1108,32 @@ static httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &api_gpio_config_post);
+
+
+        httpd_uri_t api_ota_start = {
+            .uri       = "/api/ota_start",
+            .method    = HTTP_POST,
+            .handler   = api_ota_start_post_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_ota_start);
+
+        httpd_uri_t api_ota_check = {
+            .uri       = "/api/ota_check",
+            .method    = HTTP_GET,
+            .handler   = api_ota_check_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_ota_check);
+
+
+        httpd_uri_t ota_get = {
+            .uri       = "/ota",
+            .method    = HTTP_GET,
+            .handler   = ota_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &ota_get);
 
         return server;
     }
