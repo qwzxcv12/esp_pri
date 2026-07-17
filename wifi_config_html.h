@@ -847,10 +847,6 @@ const char* log_page = R"html(
         <div class="panel__nav">
             <!-- Secondary nav fallback inside body if needed, otherwise ignore -->
         </div>
-        <div class="panel__footer">
-            <span class="status">Realtime logs (auto-refresh 5s)</span>
-            <span class="status" style="color: var(--ok);">Active</span>
-        </div>
     </div>
 
     <script>
