@@ -36,11 +36,12 @@ inline int g_service_count = 0;
 static const char *MQTT_TAG = "mqtt_qms";
 
 // Add log helper
-inline void add_device_log(const char* format, ...) {
-    char log_buf[1024];
+inline __attribute__((noinline)) void add_device_log(const char* format, ...) {
+    char *log_buf = (char *)malloc(1024);
+    if (!log_buf) return;
     va_list args;
     va_start(args, format);
-    vsnprintf(log_buf, sizeof(log_buf), format, args);
+    vsnprintf(log_buf, 1024, format, args);
     va_end(args);
 
     // Get uptime
@@ -62,6 +63,7 @@ inline void add_device_log(const char* format, ...) {
     
     // Also print to console
     ESP_LOGI(MQTT_TAG, "%s", log_buf);
+    free(log_buf);
 }
 
 #include "audio_player.h"
