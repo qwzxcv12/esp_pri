@@ -93,11 +93,14 @@ static void play_tts_task(void *pvParameters) {
 
     extern void add_device_log(const char* format, ...);
     add_device_log("TTS: Requesting speech: '%s'", req_data->text);
+    add_device_log("TTS: Connecting to %s", tts_url);
 
-    if (esp_http_client_open(client, strlen(post_data)) == ESP_OK) {
+    esp_err_t err = esp_http_client_open(client, strlen(post_data));
+    if (err == ESP_OK) {
         int content_length = esp_http_client_fetch_headers(client);
         int status_code = esp_http_client_get_status_code(client);
         if (content_length >= 0 || status_code == 200) {
+            add_device_log("TTS: Connected successfully! (Status: %d, Length: %d)", status_code, content_length);
             char buffer[1024];
             int read_bytes;
             bool header_skipped = false;
@@ -127,10 +130,10 @@ static void play_tts_task(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(500));
             i2s_zero_dma_buffer(I2S_SPEAKER_PORT);
         } else {
-            add_device_log("TTS Error: Invalid response length");
+            add_device_log("TTS Error: Invalid response length or status. Status: %d, Length: %d", status_code, content_length);
         }
     } else {
-        add_device_log("TTS Error: Connect to Sherpa server failed");
+        add_device_log("TTS Error: Connect to %s failed (esp_err: %d)", tts_url, err);
     }
 
     esp_http_client_cleanup(client);
