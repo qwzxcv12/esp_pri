@@ -27,6 +27,7 @@ jobs:
           cp idf_component.yml project/main/
           cp CMakeLists_main.txt project/main/CMakeLists.txt
           cp sdkconfig.defaults project/
+          cp partitions.csv project/ || true
 
           # Create root CMakeLists.txt
           printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude($ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject(pri_NOW)\n' > project/CMakeLists.txt
