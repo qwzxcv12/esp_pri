@@ -55,6 +55,7 @@ const char* html_page = R"html(
             align-items: center;
             gap: 12px;
             height: 85px;
+            flex: none;
             padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
@@ -132,6 +133,7 @@ const char* html_page = R"html(
             display: flex;
             border-bottom: 1px solid var(--line);
             background: rgba(0, 0, 0, 0.25);
+            flex: none;
         }
         .nav-item {
             flex: 1;
@@ -655,6 +657,7 @@ const char* log_page = R"html(
             justify-content: space-between;
             align-items: center;
             height: 85px;
+            flex: none;
             padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
@@ -671,6 +674,7 @@ const char* log_page = R"html(
             display: flex;
             border-bottom: 1px solid var(--line);
             background: rgba(0, 0, 0, 0.25);
+            flex: none;
         }
         .nav-item {
             flex: 1;
@@ -736,6 +740,7 @@ const char* log_page = R"html(
         .log-control {
             padding: 16px 20px;
             background: rgba(0, 0, 0, 0.25);
+            flex: none;
             border-top: 1px solid var(--line);
             display: flex;
             flex-direction: column;
@@ -1271,6 +1276,7 @@ const char* gpio_page = R"html(
             align-items: center;
             gap: 12px;
             height: 85px;
+            flex: none;
             padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
@@ -1286,6 +1292,7 @@ const char* gpio_page = R"html(
             display: flex;
             border-bottom: 1px solid var(--line);
             background: rgba(0, 0, 0, 0.25);
+            flex: none;
         }
         .nav-item {
             flex: 1;
