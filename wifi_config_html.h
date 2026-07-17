@@ -1425,13 +1425,22 @@ const char* gpio_page = R"html(
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: params
                     });
-                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    // Poll for services up to 5 times (5 seconds total)
+                    for (let i = 0; i < 5; i++) {
+                        await new Promise(r => setTimeout(r, 1000));
+                        const res = await fetch('/api/services');
+                        services = await res.json();
+                        if (services.length > 0) break;
+                    }
                     document.getElementById('syncBtn').innerText = "Sync Services";
-                }
-                const res = await fetch('/api/services');
-                services = await res.json();
-                if (triggerMqtt && services.length === 0) {
-                    alert("Không lấy được danh sách. Hãy kiểm tra kết nối MQTT!");
+                    
+                    if (services.length === 0) {
+                        alert("Không lấy được danh sách. Hãy kiểm tra kết nối MQTT!");
+                    }
+                } else {
+                    const res = await fetch('/api/services');
+                    services = await res.json();
                 }
                 renderAll();
             } catch (e) {
