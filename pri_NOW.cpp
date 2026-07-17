@@ -17,7 +17,7 @@
 #include "wifi_config_html.h"
 #include "Arduino.h"
 #include "mqtt_handler.h"
-
+#include "driver/gpio.h"
 static const char *TAG = "wifi_manager";
 
 
@@ -166,6 +166,28 @@ esp_err_t read_dev_credentials(char* dev_id, size_t id_len, char* dev_key, size_
     }
     if (nvs_get_str(my_handle, "dev_id", dev_id, &id_len) != ESP_OK) dev_id[0] = '\0';
     if (nvs_get_str(my_handle, "dev_key", dev_key, &key_len) != ESP_OK) dev_key[0] = '\0';
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+esp_err_t save_gpio_config(const char* json_str) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("gpio_cfg", NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) return err;
+    nvs_set_str(my_handle, "json", json_str);
+    nvs_commit(my_handle);
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+esp_err_t read_gpio_config(char* json_str, size_t max_len) {
+    nvs_handle_t my_handle;
+    esp_err_t err = nvs_open("gpio_cfg", NVS_READONLY, &my_handle);
+    if (err != ESP_OK) {
+        json_str[0] = '\0';
+        return err;
+    }
+    if (nvs_get_str(my_handle, "json", json_str, &max_len) != ESP_OK) json_str[0] = '\0';
     nvs_close(my_handle);
     return ESP_OK;
 }
@@ -592,6 +614,20 @@ static esp_err_t log_get_handler(httpd_req_t *req)
 }
 
 
+static esp_err_t gpio_get_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/login");
+        httpd_resp_sendstr(req, "Redirecting...");
+        return ESP_OK;
+    }
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    return send_log_template_chunked(req, gpio_page, g_dev_id, g_dev_key);
+}
 
 static esp_err_t log_data_get_handler(httpd_req_t *req)
 {
@@ -778,6 +814,143 @@ static esp_err_t login_post_handler(httpd_req_t *req)
     }
 }
 
+
+// ==================== GPIO API HANDLERS ====================
+static esp_err_t api_services_get_handler(httpd_req_t *req)
+{
+    if (!check_auth(req)) return ESP_OK;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    
+    cJSON *root = cJSON_CreateArray();
+    for (int i = 0; i < g_service_count; i++) {
+        cJSON *srv = cJSON_CreateObject();
+        cJSON_AddNumberToObject(srv, "id", g_services[i].id);
+        cJSON_AddStringToObject(srv, "name", g_services[i].name);
+        cJSON_AddItemToArray(root, srv);
+    }
+    char *json_str = cJSON_PrintUnformatted(root);
+    httpd_resp_send(req, json_str, strlen(json_str));
+    free(json_str);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+static esp_err_t api_gpio_config_get_handler(httpd_req_t *req)
+{
+    if (!check_auth(req)) return ESP_OK;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    
+    char saved_json[1024] = {0};
+    if (read_gpio_config(saved_json, sizeof(saved_json)) != ESP_OK || strlen(saved_json) == 0) {
+        strcpy(saved_json, "{}");
+    }
+    httpd_resp_send(req, saved_json, strlen(saved_json));
+    return ESP_OK;
+}
+
+static esp_err_t api_gpio_config_post_handler(httpd_req_t *req)
+{
+    if (!check_auth(req)) return ESP_OK;
+    
+    int remaining = req->content_len;
+    if (remaining <= 0 || remaining > 1024) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid content length");
+        return ESP_FAIL;
+    }
+    char *buf = (char*)malloc(remaining + 1);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    int cur_len = 0;
+    int ret;
+    while (remaining > 0) {
+        if ((ret = httpd_req_recv(req, buf + cur_len, remaining)) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            free(buf);
+            return ESP_FAIL;
+        }
+        cur_len += ret;
+        remaining -= ret;
+    }
+    buf[cur_len] = ' ';
+
+    esp_err_t err = save_gpio_config(buf);
+    free(buf);
+    
+    if (err == ESP_OK) {
+        httpd_resp_sendstr(req, "OK");
+        add_device_log("GPIO Config saved. Restarting to apply...");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save");
+    }
+    return ESP_OK;
+}
+
+// ==================== BUTTON TASK ====================
+static void button_task(void *pvParameters) {
+    // Parse saved JSON and configure pins
+    char saved_json[1024] = {0};
+    read_gpio_config(saved_json, sizeof(saved_json));
+    
+    if (strlen(saved_json) > 0) {
+        cJSON *root = cJSON_Parse(saved_json);
+        if (root) {
+            cJSON *board = cJSON_GetObjectItem(root, "board");
+            if (board && cJSON_IsString(board)) {
+                strncpy(g_board_type, board->valuestring, sizeof(g_board_type)-1);
+            }
+            
+            cJSON *mappings = cJSON_GetObjectItem(root, "mappings");
+            if (mappings && cJSON_IsArray(mappings)) {
+                int count = cJSON_GetArraySize(mappings);
+                g_pin_mapping_count = 0;
+                for (int i = 0; i < count && i < MAX_PIN_MAPPINGS; i++) {
+                    cJSON *item = cJSON_GetArrayItem(mappings, i);
+                    cJSON *sid = cJSON_GetObjectItem(item, "service_id");
+                    cJSON *pin = cJSON_GetObjectItem(item, "pin");
+                    if (sid && pin) {
+                        g_pin_mappings[g_pin_mapping_count].service_id = sid->valueint;
+                        g_pin_mappings[g_pin_mapping_count].pin = pin->valueint;
+                        
+                        // Setup GPIO
+                        gpio_reset_pin((gpio_num_t)pin->valueint);
+                        gpio_set_direction((gpio_num_t)pin->valueint, GPIO_MODE_INPUT);
+                        gpio_set_pull_mode((gpio_num_t)pin->valueint, GPIO_PULLUP_ONLY);
+                        
+                        g_pin_mapping_count++;
+                    }
+                }
+                add_device_log("Configured %d GPIO pins for buttons", g_pin_mapping_count);
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    // State tracking for debounce
+    int last_state[MAX_PIN_MAPPINGS];
+    for (int i=0; i<MAX_PIN_MAPPINGS; i++) last_state[i] = 1; // Pullup default High
+    
+    while (1) {
+        for (int i = 0; i < g_pin_mapping_count; i++) {
+            int current_state = gpio_get_level((gpio_num_t)g_pin_mappings[i].pin);
+            if (current_state == 0 && last_state[i] == 1) {
+                // Button pressed (falling edge)
+                add_device_log("Button pressed on pin %d", g_pin_mappings[i].pin);
+                send_ticket_request_by_service_id(g_pin_mappings[i].service_id);
+                vTaskDelay(pdMS_TO_TICKS(300)); // Debounce and block hold
+            }
+            last_state[i] = current_state;
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
 static httpd_handle_t s_webserver_handle = NULL;
 
 static httpd_handle_t start_webserver(void)
@@ -842,6 +1015,14 @@ static httpd_handle_t start_webserver(void)
         };
         httpd_register_uri_handler(server, &log_data_get);
 
+        httpd_uri_t gpio_get = {
+            .uri       = "/gpio",
+            .method    = HTTP_GET,
+            .handler   = gpio_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &gpio_get);
+
         httpd_uri_t publish_post = {
             .uri       = "/publish",
             .method    = HTTP_POST,
@@ -849,6 +1030,31 @@ static httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &publish_post);
+
+
+        httpd_uri_t api_services_get = {
+            .uri       = "/api/services",
+            .method    = HTTP_GET,
+            .handler   = api_services_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_services_get);
+
+        httpd_uri_t api_gpio_config_get = {
+            .uri       = "/api/gpio_config",
+            .method    = HTTP_GET,
+            .handler   = api_gpio_config_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_gpio_config_get);
+
+        httpd_uri_t api_gpio_config_post = {
+            .uri       = "/api/gpio_config",
+            .method    = HTTP_POST,
+            .handler   = api_gpio_config_post_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_gpio_config_post);
 
         return server;
     }
@@ -1031,5 +1237,6 @@ extern "C" void app_main(void)
     }
 
 
+    xTaskCreate(button_task, "button_task", 4096, NULL, 5, NULL);
     xTaskCreate(terminal_task, "terminal_task", 4096, NULL, 5, NULL);
 }

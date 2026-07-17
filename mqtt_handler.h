@@ -34,6 +34,16 @@ typedef struct {
 inline qms_service_t g_services[10];
 inline int g_service_count = 0;
 
+#define MAX_PIN_MAPPINGS 20
+typedef struct {
+    int service_id;
+    int pin;
+} pin_mapping_t;
+
+inline pin_mapping_t g_pin_mappings[MAX_PIN_MAPPINGS];
+inline int g_pin_mapping_count = 0;
+inline char g_board_type[16] = "ESP32"; // "ESP32" or "ESP32-S3"
+
 static const char *MQTT_TAG = "mqtt_qms";
 
 // Add log helper
