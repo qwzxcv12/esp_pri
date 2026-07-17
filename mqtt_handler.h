@@ -204,6 +204,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                             add_device_log(">>> COMMAND: Clear screen");
                             processed = true;
                         } else if (strcmp(cmd->valuestring, "init_config") == 0) {
+                            cJSON *unit_name_json = cJSON_GetObjectItem(root, "unit_name");
+                            if (unit_name_json && unit_name_json->valuestring) {
+                                add_device_log("Unit: %s", unit_name_json->valuestring);
+                                printf("Unit: %s\n", unit_name_json->valuestring);
+                            }
+
                             cJSON *services = cJSON_GetObjectItem(root, "services");
                             if (services && cJSON_IsArray(services)) {
                                 g_service_count = 0;

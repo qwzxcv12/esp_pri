@@ -825,6 +825,9 @@ const char* log_page = R"html(
             <!-- Tab 1: Kiosk Simulator -->
             <div id="kioskControlPanel" style="display: flex; flex-direction: column; gap: 10px;">
                 <div class="log-control__row">
+                    <span id="kioskUnitName" style="font-weight: bold; color: var(--accent); padding-bottom: 5px; width: 100%; border-bottom: 1px solid var(--line);">Đơn vị: Đang chờ đồng bộ...</span>
+                </div>
+                <div class="log-control__row">
                     <button class="btn btn--primary" onclick="syncServices()" style="padding: 10px 14px; background-color: var(--accent); color: var(--ink);">1. Sync Services</button>
                     <select id="kioskServiceSelect" style="flex: 1;">
                         <option value="">-- Please click Sync Services --</option>
@@ -953,6 +956,17 @@ const char* log_page = R"html(
         }
 
         function parseServicesFromLog(logData) {
+            const regexUnit = /Unit:\s*(.*)/g;
+            let matchUnit;
+            let unitName = "";
+            while ((matchUnit = regexUnit.exec(logData)) !== null) {
+                unitName = matchUnit[1];
+            }
+            if (unitName) {
+                const el = document.getElementById('kioskUnitName');
+                if (el) el.textContent = "Đơn vị: " + unitName;
+            }
+
             const regex = /Nhấn phím \d+:\s*(.*?)\s*\(Service ID:\s*(\d+)\)/g;
             let match;
             let services = [];
