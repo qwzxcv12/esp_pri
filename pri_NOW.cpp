@@ -17,7 +17,6 @@
 #include "wifi_config_html.h"
 #include "Arduino.h"
 #include "mqtt_handler.h"
-#include "audio_player.h"
 
 static const char *TAG = "wifi_manager";
 
@@ -884,9 +883,6 @@ extern "C" void app_main(void)
 {
     // Initialize Arduino Core
     initArduino();
-
-    // Initialize I2S Audio Speaker
-    init_i2s_audio();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();

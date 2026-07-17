@@ -181,22 +181,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
                                 processed = true;
-
-                                const char *action = cJSON_GetStringValue(cJSON_GetObjectItem(data, "action"));
-                                char speech_text[128] = {0};
-                                if (action && strcmp(action, "recall") == 0) {
-                                    snprintf(speech_text, sizeof(speech_text), "Mời lại số %s đến %s", ticket ? ticket : "", counter ? counter : "");
-                                } else {
-                                    snprintf(speech_text, sizeof(speech_text), "Mời số %s đến %s", ticket ? ticket : "", counter ? counter : "");
-                                }
-
-                                tts_request_t *tts_req = (tts_request_t*)malloc(sizeof(tts_request_t));
-                                if (tts_req) {
-                                    strncpy(tts_req->text, speech_text, sizeof(tts_req->text) - 1);
-                                    tts_req->text[sizeof(tts_req->text) - 1] = '\0';
-                                    xTaskCreate(play_tts_task, "play_tts_task", 8192, tts_req, 5, NULL);
-                                }
-
                                 if (cust_name) {
                                     add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s, Customer=%s", 
                                         ticket ? ticket : "N/A", 
