@@ -1415,8 +1415,19 @@ const char* gpio_page = R"html(
 
         async function fetchServices(triggerMqtt = false) {
             try {
+                // Step 1: Always try API first (services may already be loaded from MQTT auto-sync)
+                let res = await fetch('/api/services');
+                services = await res.json();
+                
+                if (services.length > 0 && !triggerMqtt) {
+                    renderAll();
+                    return;
+                }
+                
                 if (triggerMqtt) {
                     document.getElementById('syncBtn').innerText = "Syncing...";
+                    
+                    // Step 2: Send MQTT get_config request
                     const topic = `qms/sender/${devId}/request`;
                     const payload = JSON.stringify({ cmd: "get_config", secret_key: devKey });
                     const params = `topic=${encodeURIComponent(topic)}&payload=${encodeURIComponent(payload)}`;
@@ -1426,21 +1437,37 @@ const char* gpio_page = R"html(
                         body: params
                     });
                     
-                    // Poll for services up to 5 times (5 seconds total)
+                    // Step 3: Poll API + fallback to log parsing (5 attempts, 1s each)
                     for (let i = 0; i < 5; i++) {
                         await new Promise(r => setTimeout(r, 1000));
-                        const res = await fetch('/api/services');
+                        
+                        // Try API first
+                        res = await fetch('/api/services');
                         services = await res.json();
                         if (services.length > 0) break;
+                        
+                        // Fallback: parse services from device log (proven method from Kiosk tab)
+                        try {
+                            const logRes = await fetch('/log_data');
+                            const logData = await logRes.text();
+                            const regex = /Nhấn phím \d+:\s*(.*?)\s*\(Service ID:\s*(\d+)\)/g;
+                            let match;
+                            let logServices = [];
+                            while ((match = regex.exec(logData)) !== null) {
+                                logServices.push({ id: parseInt(match[2]), name: match[1] });
+                            }
+                            if (logServices.length > 0) {
+                                services = logServices;
+                                break;
+                            }
+                        } catch(logErr) { /* ignore log parse errors */ }
                     }
+                    
                     document.getElementById('syncBtn').innerText = "Sync Services";
                     
                     if (services.length === 0) {
                         alert("Không lấy được danh sách. Hãy kiểm tra kết nối MQTT!");
                     }
-                } else {
-                    const res = await fetch('/api/services');
-                    services = await res.json();
                 }
                 renderAll();
             } catch (e) {

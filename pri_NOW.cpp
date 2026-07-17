@@ -681,7 +681,7 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
     buf[cur_len] = '\0';
 
     char topic[256] = {0};
-    char payload[512] = {0};
+    char payload[1024] = {0};
 
     parse_url_param(buf, "topic", topic, sizeof(topic));
     parse_url_param(buf, "payload", payload, sizeof(payload));
