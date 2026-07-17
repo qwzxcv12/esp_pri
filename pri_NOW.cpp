@@ -179,13 +179,21 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         add_device_log("Connecting to AP...");
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < MAXIMUM_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            add_device_log("Retry connection to AP (%d/%d)", s_retry_num, MAXIMUM_RETRY);
+        if (s_wifi_event_group != NULL) {
+            // Boot phase: limited retries
+            if (s_retry_num < MAXIMUM_RETRY) {
+                esp_wifi_connect();
+                s_retry_num++;
+                add_device_log("Retry connection to AP (%d/%d)", s_retry_num, MAXIMUM_RETRY);
+            } else {
+                add_device_log("WiFi connection failed after max retries.");
+                xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            }
         } else {
-            add_device_log("WiFi connection failed after max retries.");
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            // Runtime phase: infinite retries
+            add_device_log("WiFi lost during runtime. Retrying in 5s...");
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            esp_wifi_connect();
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
@@ -850,17 +858,6 @@ static httpd_handle_t start_webserver(void)
 }
 
 
-
-static void webserver_timeout_task(void *pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(15 * 60 * 1000)); // 15 minutes
-    if (s_webserver_handle != NULL) {
-        // add_device_log("Web server timeout (15 mins). Shutting down web server for security.");
-        // httpd_stop(s_webserver_handle);
-        // s_webserver_handle = NULL;
-    }
-    vTaskDelete(NULL);
-}
-
 static void terminal_task(void *pvParameters) {
     while (1) {
         int c = fgetc(stdin);
@@ -991,6 +988,7 @@ extern "C" void app_main(void)
         }
 
         vEventGroupDelete(s_wifi_event_group);
+        s_wifi_event_group = NULL;
     } else {
         add_device_log("No stored WiFi credentials found in NVS.");
     }
@@ -1032,9 +1030,6 @@ extern "C" void app_main(void)
         }
     }
 
-    if (s_webserver_handle != NULL) {
-        xTaskCreate(webserver_timeout_task, "webserver_timeout", 2048, NULL, 5, NULL);
-    }
-    
+
     xTaskCreate(terminal_task, "terminal_task", 4096, NULL, 5, NULL);
 }
