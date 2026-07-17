@@ -803,6 +803,7 @@ const char* log_page = R"html(
         <div class="panel__header">
             <h2>Device Logs &amp; Diagnostics</h2>
             <div style="display: flex; gap: 8px;">
+                <button class="btn btn--primary" onclick="copyLogs()" style="background-color: var(--ok); color: var(--ink);">Copy</button>
                 <button class="btn btn--primary" onclick="fetchLogs()">Refresh</button>
             </div>
         </div>
@@ -1007,6 +1008,31 @@ const char* log_page = R"html(
             const statusBox = document.getElementById('kioskStatus');
             statusBox.textContent = `Synced ${services.length} services!`;
             statusBox.style.color = 'var(--ok)';
+        }
+
+        function copyLogs() {
+            const logBox = document.getElementById('logBox');
+            if (!logBox) return;
+            const textToCopy = logBox.innerText;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    alert("Đã copy toàn bộ log!");
+                }).catch(err => {
+                    alert("Lỗi khi copy: " + err);
+                });
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("Đã copy toàn bộ log!");
+                } catch (err) {
+                    alert("Lỗi khi copy: " + err);
+                }
+                document.body.removeChild(textArea);
+            }
         }
 
         function applyTemplate() {
