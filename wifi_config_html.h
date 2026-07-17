@@ -1267,9 +1267,6 @@ const char* gpio_page = R"html(
             border-radius: 8px;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            max-height: 90vh;
         }
         .panel__header {
             display: flex;
@@ -1319,9 +1316,7 @@ const char* gpio_page = R"html(
         }
         
         .container {
-            padding: 20px 24px;
-            overflow-y: auto;
-            flex: 1;
+            padding: 24px;
         }
         
         .btn {
