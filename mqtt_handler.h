@@ -78,14 +78,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         add_device_log("MQTT CONNECTED to broker!");
-        if (show_startup_messages) {
-char buf[128];
-            if (strlen(g_sta_ip) > 0) {
-                snprintf(buf, sizeof(buf), "xanh IP: %s - MQTT Connected", g_sta_ip);
-            } else {
-                snprintf(buf, sizeof(buf), "xanh MQTT Connected");
-            }
-        }
+
         if (strlen(g_mqtt_topic) > 0) {
             char topic_buf[256];
             strncpy(topic_buf, g_mqtt_topic, sizeof(topic_buf) - 1);
@@ -122,14 +115,7 @@ char buf[128];
 
     case MQTT_EVENT_DISCONNECTED:
         add_device_log("MQTT DISCONNECTED. Reconnecting...");
-        if (show_startup_messages) {
-char buf[128];
-            if (strlen(g_sta_ip) > 0) {
-                snprintf(buf, sizeof(buf), "cam IP: %s - MQTT Disconnected", g_sta_ip);
-            } else {
-                snprintf(buf, sizeof(buf), "cam MQTT Disconn");
-            }
-        }
+
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -166,7 +152,6 @@ char buf[128];
                                 const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
                                 const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
-                                snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
                                 processed = true;
 
                                 const char *action = cJSON_GetStringValue(cJSON_GetObjectItem(data, "action"));
@@ -215,14 +200,7 @@ char buf[128];
 
     case MQTT_EVENT_ERROR:
         add_device_log("MQTT Error occurred");
-        if (show_startup_messages) {
-char buf[128];
-            if (strlen(g_sta_ip) > 0) {
-                snprintf(buf, sizeof(buf), "do IP: %s - MQTT Error", g_sta_ip);
-            } else {
-                snprintf(buf, sizeof(buf), "do MQTT Error");
-            }
-        }
+
         break;
 
     default:

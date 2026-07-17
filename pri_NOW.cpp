@@ -190,11 +190,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        snprintf(g_sta_ip, sizeof(g_sta_ip), IPSTR, IP2STR(&event->ip_info.ip));
-        add_device_log("Successfully got IP: %s", g_sta_ip);
+        char ip_str[32];
+        snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
+        add_device_log("Successfully got IP: %s", ip_str);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        }
     }
 }
 
@@ -653,7 +653,6 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
                         if (data) {
                             const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
                             const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
-                            snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
                             local_processed = true;
                         }
                     } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
