@@ -14,7 +14,7 @@
 #include "mqtt_client.h"
 #include "cJSON.h"
 
-#define MAX_LOG_LINES 50
+#define MAX_LOG_LINES 100
 
 // Global variables (using inline to avoid multiple definition errors)
 inline std::vector<std::string> g_device_logs;
@@ -37,7 +37,7 @@ static const char *MQTT_TAG = "mqtt_qms";
 
 // Add log helper
 inline void add_device_log(const char* format, ...) {
-    char log_buf[256];
+    char log_buf[1024];
     va_list args;
     va_start(args, format);
     vsnprintf(log_buf, sizeof(log_buf), format, args);
@@ -291,6 +291,12 @@ inline void mqtt_app_start(const char* broker, int port, const char* user, const
 
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = uri;
+#include "esp_idf_version.h"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    mqtt_cfg.buffer.size = 2048;
+#else
+    mqtt_cfg.buffer_size = 2048;
+#endif
     if (strlen(user) > 0) {
         mqtt_cfg.credentials.username = user;
     }
