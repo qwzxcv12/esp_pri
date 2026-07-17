@@ -16,13 +16,12 @@
 #include "esp_system.h"
 #include "wifi_config_html.h"
 #include "Arduino.h"
-#include "led_display.h"
 #include "mqtt_handler.h"
 #include "audio_player.h"
 
 static const char *TAG = "wifi_manager";
 
-static void startup_display_timeout_task(void *pvParameters);
+
 
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -179,26 +178,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         add_device_log("Connecting to AP...");
-        if (show_startup_messages) {
-            processMessage("cam Connecting WiFi");
-        }
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
             add_device_log("Retry connection to AP (%d/%d)", s_retry_num, MAXIMUM_RETRY);
-            if (show_startup_messages) {
-                char buf[64];
-                snprintf(buf, sizeof(buf), "cam Retry WiFi %d/%d", s_retry_num, MAXIMUM_RETRY);
-                processMessage(buf);
-            }
         } else {
             add_device_log("WiFi connection failed after max retries.");
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-            if (show_startup_messages) {
-                processMessage("do WiFi Failed");
-            }
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
@@ -206,17 +194,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         add_device_log("Successfully got IP: %s", g_sta_ip);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        if (show_startup_messages) {
-            char buf[96];
-            snprintf(buf, sizeof(buf), "xanh IP: %s", g_sta_ip);
-            processMessage(buf);
-            
-            // Start the 30-second timer to clear the startup messages now that we got the IP!
-            static bool timer_started = false;
-            if (!timer_started) {
-                xTaskCreate(startup_display_timeout_task, "display_timeout", 2048, NULL, 5, NULL);
-                timer_started = true;
-            }
         }
     }
 }
@@ -676,20 +653,16 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
                         if (data) {
                             const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
                             const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
-                            char disp_msg[128];
                             snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
-                            processMessage(disp_msg);
                             local_processed = true;
                         }
                     } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
-                        processMessage("clear");
                         local_processed = true;
                     }
                 }
                 cJSON_Delete(root);
             }
             if (!local_processed) {
-                processMessage(payload);
                 local_processed = true;
             }
         }
@@ -881,12 +854,7 @@ static httpd_handle_t start_webserver(void)
     return NULL;
 }
 
-static void startup_display_timeout_task(void *pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(30000));
-    show_startup_messages = false;
-    processMessage("clear");
-    vTaskDelete(NULL);
-}
+
 
 static void webserver_timeout_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(15 * 60 * 1000)); // 15 minutes
@@ -917,9 +885,7 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "NVS Storage Initialized");
 
     // Initialize LED Display
-    setup_led_display();
-
-    // Initialize Network and Events
+// Initialize Network and Events
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -1017,11 +983,6 @@ extern "C" void app_main(void)
 
     if (!connected) {
         add_device_log("Starting Access Point and Captive Portal...");
-        if (show_startup_messages) {
-            processMessage("vang AP: Config WiFi");
-            // Start the 30-second timer to clear the startup messages in AP mode
-            xTaskCreate(startup_display_timeout_task, "display_timeout", 2048, NULL, 5, NULL);
-        }
         
         esp_wifi_stop();
 

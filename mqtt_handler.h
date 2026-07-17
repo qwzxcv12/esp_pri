@@ -79,14 +79,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         add_device_log("MQTT CONNECTED to broker!");
         if (show_startup_messages) {
-            extern void processMessage(const char* command);
-            char buf[128];
+char buf[128];
             if (strlen(g_sta_ip) > 0) {
                 snprintf(buf, sizeof(buf), "xanh IP: %s - MQTT Connected", g_sta_ip);
             } else {
                 snprintf(buf, sizeof(buf), "xanh MQTT Connected");
             }
-            processMessage(buf);
         }
         if (strlen(g_mqtt_topic) > 0) {
             char topic_buf[256];
@@ -125,14 +123,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_DISCONNECTED:
         add_device_log("MQTT DISCONNECTED. Reconnecting...");
         if (show_startup_messages) {
-            extern void processMessage(const char* command);
-            char buf[128];
+char buf[128];
             if (strlen(g_sta_ip) > 0) {
                 snprintf(buf, sizeof(buf), "cam IP: %s - MQTT Disconnected", g_sta_ip);
             } else {
                 snprintf(buf, sizeof(buf), "cam MQTT Disconn");
             }
-            processMessage(buf);
         }
         break;
 
@@ -170,11 +166,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
                                 const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
-
-                                extern void processMessage(const char* command);
-                                char disp_msg[128];
                                 snprintf(disp_msg, sizeof(disp_msg), "%s %s", (color && strlen(color) > 0) ? color : "do", ticket ? ticket : "");
-                                processMessage(disp_msg);
                                 processed = true;
 
                                 const char *action = cJSON_GetStringValue(cJSON_GetObjectItem(data, "action"));
@@ -206,8 +198,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 }
                             }
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
-                            extern void processMessage(const char* command);
-                            processMessage("clear");
                             add_device_log(">>> COMMAND: Clear screen");
                             processed = true;
                         }
@@ -217,8 +207,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                     add_device_log("Warning: Failed to parse JSON");
                 }
                 if (!processed && strlen(json_buf) > 0) {
-                    extern void processMessage(const char* command);
-                    processMessage(json_buf);
                 }
                 free(json_buf);
             }
@@ -228,14 +216,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_ERROR:
         add_device_log("MQTT Error occurred");
         if (show_startup_messages) {
-            extern void processMessage(const char* command);
-            char buf[128];
+char buf[128];
             if (strlen(g_sta_ip) > 0) {
                 snprintf(buf, sizeof(buf), "do IP: %s - MQTT Error", g_sta_ip);
             } else {
                 snprintf(buf, sizeof(buf), "do MQTT Error");
             }
-            processMessage(buf);
         }
         break;
 
