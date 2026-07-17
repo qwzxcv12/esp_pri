@@ -855,9 +855,9 @@ static httpd_handle_t start_webserver(void)
 static void webserver_timeout_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(15 * 60 * 1000)); // 15 minutes
     if (s_webserver_handle != NULL) {
-        add_device_log("Web server timeout (15 mins). Shutting down web server for security.");
-        httpd_stop(s_webserver_handle);
-        s_webserver_handle = NULL;
+        // add_device_log("Web server timeout (15 mins). Shutting down web server for security.");
+        // httpd_stop(s_webserver_handle);
+        // s_webserver_handle = NULL;
     }
     vTaskDelete(NULL);
 }
