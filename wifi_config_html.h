@@ -856,11 +856,7 @@ const char* log_page = R"html(
         const devKey = "{{DEV_KEY}}";
         let servicesList = [];
 
-        if (devId) {
-            document.getElementById('cmdTopic').value = `qms/display/${devId}/command`;
-        } else {
-            document.getElementById('cmdTopic').value = "qms/display/command";
-        }
+
 
         function switchControlTab(tab) {
             // Only kiosk tab exists now
