@@ -818,7 +818,7 @@ static esp_err_t login_post_handler(httpd_req_t *req)
 // ==================== GPIO API HANDLERS ====================
 static esp_err_t api_services_get_handler(httpd_req_t *req)
 {
-    if (!check_auth(req)) return ESP_OK;
+    if (!is_authorized(req)) return ESP_OK;
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Connection", "close");
     
@@ -838,7 +838,7 @@ static esp_err_t api_services_get_handler(httpd_req_t *req)
 
 static esp_err_t api_gpio_config_get_handler(httpd_req_t *req)
 {
-    if (!check_auth(req)) return ESP_OK;
+    if (!is_authorized(req)) return ESP_OK;
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Connection", "close");
     
@@ -852,7 +852,7 @@ static esp_err_t api_gpio_config_get_handler(httpd_req_t *req)
 
 static esp_err_t api_gpio_config_post_handler(httpd_req_t *req)
 {
-    if (!check_auth(req)) return ESP_OK;
+    if (!is_authorized(req)) return ESP_OK;
     
     int remaining = req->content_len;
     if (remaining <= 0 || remaining > 1024) {
@@ -876,7 +876,7 @@ static esp_err_t api_gpio_config_post_handler(httpd_req_t *req)
         cur_len += ret;
         remaining -= ret;
     }
-    buf[cur_len] = ' ';
+    buf[cur_len] = '\0';
 
     esp_err_t err = save_gpio_config(buf);
     free(buf);
