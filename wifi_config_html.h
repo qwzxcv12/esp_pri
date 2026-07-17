@@ -37,7 +37,8 @@ const char* html_page = R"html(
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 24px 0;
+            padding: 24px 16px;
+            overflow-y: scroll;
         }
         .panel {
             width: 540px;
@@ -51,17 +52,32 @@ const char* html_page = R"html(
         }
         .panel__header {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 12px;
-            padding: 22px 24px 18px;
+            height: 85px;
+            padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
-        .chip-icon {
-            flex: none;
-            width: 30px;
-            height: 30px;
-            color: var(--accent);
-            margin-top: 2px;
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #ff8f00);
+            padding: 8px;
+            color: var(--ink);
+            box-shadow: 0 4px 12px var(--accent-dim);
+        }
+        .title-wrap {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h2 {
+            margin: 0 0 4px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.2;
         }
         .panel__heading {
             flex: 1;
@@ -619,7 +635,8 @@ const char* log_page = R"html(
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 24px 16px;
+            overflow-y: scroll;
         }
         .panel {
             width: 540px;
@@ -634,17 +651,19 @@ const char* log_page = R"html(
             height: 90vh;
         }
         .panel__header {
-            padding: 18px 24px;
-            border-bottom: 1px solid var(--line);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            height: 85px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--line);
         }
         h2 {
             margin: 0;
             font-size: 18px;
             font-weight: 600;
             color: var(--text);
+            line-height: 1.2;
         }
         
         /* Navigation Bar */
@@ -701,7 +720,8 @@ const char* log_page = R"html(
         
         .log-container {
             flex: 1;
-            padding: 20px;
+            padding: 24px 16px;
+            overflow-y: scroll;
             overflow-y: auto;
             background: #070a0e;
             font-family: var(--mono);
@@ -844,9 +864,6 @@ const char* log_page = R"html(
             </div>
         </div>
 
-        <div class="panel__nav">
-            <!-- Secondary nav fallback inside body if needed, otherwise ignore -->
-        </div>
     </div>
 
     <script>
@@ -1080,7 +1097,8 @@ const char* login_page = R"html(
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 24px 16px;
+            overflow-y: scroll;
         }
         .panel {
             width: 360px;
@@ -1232,7 +1250,8 @@ const char* gpio_page = R"html(
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 24px 0;
+            padding: 24px 16px;
+            overflow-y: scroll;
         }
         .panel {
             width: 540px;
@@ -1249,17 +1268,19 @@ const char* gpio_page = R"html(
         }
         .panel__header {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 12px;
-            padding: 22px 24px 18px;
+            height: 85px;
+            padding: 0 24px;
             border-bottom: 1px solid var(--line);
         }
         h2 {
-            margin: 2px 0 6px;
-            font-size: 19px;
+            margin: 0;
+            font-size: 18px;
             font-weight: 600;
             color: var(--text);
             flex: 1;
+            line-height: 1.2;
         }
         .panel__nav {
             display: flex;
@@ -1399,7 +1420,8 @@ const char* gpio_page = R"html(
             </div>
             
             <div id="mappingContainer">
-                <div style="text-align: center; color: var(--muted); padding: 20px;">Loading configuration...</div>
+                <div style="text-align: center; color: var(--muted); padding: 24px 16px;
+            overflow-y: scroll;">Loading configuration...</div>
             </div>
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
@@ -1529,7 +1551,8 @@ const char* gpio_page = R"html(
             container.innerHTML = '';
             
             if (currentMappings.length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px;">No buttons mapped.</div>';
+                container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 24px 16px;
+            overflow-y: scroll;">No buttons mapped.</div>';
                 return;
             }
             
