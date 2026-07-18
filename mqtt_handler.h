@@ -13,6 +13,10 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "cJSON.h"
+#include "receipt_template.h"
+
+extern ThermalPrinter g_printer;
+extern char g_unit_name[128];
 
 #define MAX_LOG_LINES 100
 
@@ -203,12 +207,25 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                         service ? service : "N/A");
                                 }
                             }
+                        } else if (strcmp(cmd->valuestring, "print_ticket") == 0) {
+                            cJSON *data = cJSON_GetObjectItem(root, "data");
+                            if (data) {
+                                const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
+                                const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
+                                const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+                                
+                                add_device_log(">>> PRINTING TICKET: %s (Service: %s)", ticket ? ticket : "N/A", service ? service : "N/A");
+                                print_qms_ticket(g_printer, g_unit_name, service, ticket, cust_name);
+                            }
+                            processed = true;
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                             add_device_log(">>> COMMAND: Clear screen");
                             processed = true;
                         } else if (strcmp(cmd->valuestring, "init_config") == 0) {
                             cJSON *unit_name_json = cJSON_GetObjectItem(root, "unit_name");
                             if (unit_name_json && unit_name_json->valuestring) {
+                                strncpy(g_unit_name, unit_name_json->valuestring, 127);
+                                g_unit_name[127] = '\0';
                                 add_device_log("Unit: %s", unit_name_json->valuestring);
                                 printf("Unit: %s\n", unit_name_json->valuestring);
                             }

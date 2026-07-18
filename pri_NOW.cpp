@@ -20,6 +20,25 @@
 #include "driver/gpio.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
+#include "thermal_printer.h"
+
+ThermalPrinter g_printer(UART_NUM_2);
+char g_unit_name[128] = "HE THONG XEP HANG";
+
+void init_thermal_printer() {
+    uart_config_t uart_config = {
+        .baud_rate = 9600,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    uart_param_config(UART_NUM_2, &uart_config);
+    uart_set_pin(UART_NUM_2, GPIO_NUM_17, GPIO_NUM_18, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_driver_install(UART_NUM_2, 256, 0, 0, NULL, 0);
+    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18");
+}
 static const char *TAG = "wifi_manager";
 
 
@@ -1168,6 +1187,9 @@ extern "C" void app_main(void)
 {
     // Initialize Arduino Core
     initArduino();
+    
+    // Khởi tạo UART máy in nhiệt
+    init_thermal_printer();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
