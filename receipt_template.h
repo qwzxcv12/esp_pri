@@ -4,6 +4,7 @@
 #include "thermal_printer.h"
 #include <time.h>
 #include <sys/time.h>
+#include <stdlib.h>
 
 inline void print_qms_ticket(ThermalPrinter &printer, const char* unitName, const char* serviceName, const char* ticketNum, const char* customerName = nullptr) {
     // 1. Reset cài đặt
