@@ -42,7 +42,7 @@ private:
         sendByte(sizeCmd);
     }
 
-    uint8_t constrain(uint8_t val, uint8_t min_val, uint8_t max_val) {
+    uint8_t clamp_val(uint8_t val, uint8_t min_val, uint8_t max_val) {
         if (val < min_val) return min_val;
         if (val > max_val) return max_val;
         return val;
@@ -58,7 +58,7 @@ public:
     ThermalPrinter(uart_port_t uart_num) : _uart_num(uart_num) {}
     
     void setSize(uint8_t size) {
-        _currentSettings.size = constrain(size, 1, 8);
+        _currentSettings.size = clamp_val(size, 1, 8);
         updatePrintMode();
     }
     
@@ -87,7 +87,7 @@ public:
     }
     
     void setCharSpacing(uint8_t spacing) {
-        _currentSettings.charSpacing = constrain(spacing, 0, 13);
+        _currentSettings.charSpacing = clamp_val(spacing, 0, 13);
         sendByte(ESC);
         sendByte(0x52);
         sendByte(_currentSettings.charSpacing);
