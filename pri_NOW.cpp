@@ -331,6 +331,9 @@ static std::string replace_placeholder(std::string str, const std::string& place
 
 static bool is_authorized(httpd_req_t *req)
 {
+    if (g_in_ap_mode) {
+        return true; // Always allow configuration access in AP mode
+    }
     size_t hdr_len = httpd_req_get_hdr_value_len(req, "Cookie");
     if (hdr_len == 0) {
         return false;
