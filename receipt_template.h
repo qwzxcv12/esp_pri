@@ -176,11 +176,10 @@ inline void print_qms_ticket(ThermalPrinter &printer,
         strftime(timePrintBuf, sizeof(timePrintBuf), "STT duoc in luc: %H:%M:%S ngay %d/%m/%Y", &timeinfo);
     }
 
-    printer.println("");
     printer.println(timePrintBuf);
 
-    // 6. Cắt giấy
-    printer.println("\n\n\n\n\n");
+    // 6. Cắt giấy (Chỉ đẩy nhẹ 2 dòng vừa đủ dao cắt không đè vào chữ)
+    printer.println("\n\n");
     printer.cut();
 }
 
@@ -235,7 +234,7 @@ inline void print_startup_test_ticket(ThermalPrinter &printer, const char* dev_i
     printer.setLineSpacing(55);
     printer.println("DA SAN SANG KET NOI & HOAT DONG");
     
-    printer.println("\n\n\n\n\n");
+    printer.println("\n\n");
     printer.cut();
 }
 
