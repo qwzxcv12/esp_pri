@@ -557,7 +557,81 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         parse_url_param(buf, "ssid", ssid, sizeof(ssid));
         parse_url_param(buf, "password", password, sizeof(password));
         err = save_wifi_credentials(ssid, password);
-        add_device_log("Network configuration saved.");
+        add_device_log("Network configuration saved. Testing live connection to SSID: %s...", ssid);
+        free(buf);
+
+        if (err != ESP_OK) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save configuration");
+            return ESP_FAIL;
+        }
+
+        // Test live connection in background
+        wifi_config_t wifi_config = {};
+        strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+        strncpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+
+        esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+        esp_wifi_connect();
+
+        // Poll for assigned IP for up to 6 seconds
+        char got_ip_str[32] = {0};
+        esp_netif_ip_info_t ip_info;
+        esp_netif_t* netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        
+        for (int i = 0; i < 12; i++) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            if (netif_sta && esp_netif_get_ip_info(netif_sta, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+                snprintf(got_ip_str, sizeof(got_ip_str), IPSTR, IP2STR(&ip_info.ip));
+                add_device_log("Live connection successful! IP: %s", got_ip_str);
+                break;
+            }
+        }
+
+        char response_html[1536];
+        if (strlen(got_ip_str) > 0) {
+            snprintf(response_html, sizeof(response_html),
+                "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                "<title>WiFi Connected</title><style>"
+                "body { font-family: system-ui, sans-serif; background: #0b0f14; color: #fff; text-align: center; padding: 40px 20px; }"
+                ".card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; max-width: 400px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }"
+                "h2 { color: #5ec98f; margin-top: 0; font-size: 22px; }"
+                ".ip-label { color: #8b949e; font-size: 13px; margin-top: 16px; text-transform: uppercase; letter-spacing: 1px; }"
+                ".ip-box { font-size: 24px; font-weight: bold; font-family: monospace; color: #ffb454; background: rgba(0,0,0,0.5); padding: 14px; border-radius: 8px; margin: 10px 0 20px; border: 1px solid #ffb454; }"
+                ".btn { display: inline-block; padding: 14px 28px; background: #5ec98f; color: #0b0f14; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 15px; }"
+                ".btn:hover { background: #73d9a1; }"
+                "</style>"
+                "<script>setTimeout(function() { window.location.href = 'http://%s/'; }, 6000);</script>"
+                "</head><body><div class=\"card\">"
+                "<h2>&#10004; Wi-Fi Connected!</h2>"
+                "<p style=\"color:#c9d1d9;\">Successfully connected to <strong>%s</strong></p>"
+                "<div class=\"ip-label\">Device IP Address</div>"
+                "<div class=\"ip-box\">%s</div>"
+                "<p style=\"color:#8b949e; font-size:12px; margin-bottom:20px;\">Redirecting to <a href=\"http://%s/\" style=\"color:#5ec98f;\">http://%s/</a> in 6 seconds...</p>"
+                "<a href=\"http://%s/\" class=\"btn\">Open Device Page Now</a>"
+                "</div></body></html>",
+                got_ip_str, ssid, got_ip_str, got_ip_str, got_ip_str, got_ip_str);
+        } else {
+            snprintf(response_html, sizeof(response_html),
+                "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+                "<title>WiFi Saved</title><style>"
+                "body { font-family: system-ui, sans-serif; background: #0b0f14; color: #fff; text-align: center; padding: 40px 20px; }"
+                ".card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; max-width: 400px; margin: 0 auto; }"
+                "h2 { color: #5ec98f; margin-top: 0; }"
+                ".btn { display: inline-block; margin-top: 16px; padding: 12px 24px; background: #5ec98f; color: #0b0f14; text-decoration: none; font-weight: bold; border-radius: 6px; }"
+                "</style></head><body><div class=\"card\">"
+                "<h2>Wi-Fi Credentials Saved!</h2>"
+                "<p>Connecting to <strong>%s</strong>...</p>"
+                "<p style=\"color:#8b949e; font-size:13px;\">ESP32 is rebooting. Please reconnect your phone to your home Wi-Fi network and check your router's DHCP list.</p>"
+                "<a href=\"/log\" class=\"btn\">System Logs</a>"
+                "</div></body></html>",
+                ssid);
+        }
+
+        httpd_resp_set_hdr(req, "Connection", "close");
+        httpd_resp_sendstr(req, response_html);
+        xTaskCreate(restart_task, "restart_task", 2048, NULL, 5, NULL);
+        return ESP_OK;
     } 
     else if (strcmp(config_section, "MQTT") == 0) {
         char mqtt_server[64] = {0};
