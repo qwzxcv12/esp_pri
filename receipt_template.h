@@ -86,52 +86,85 @@ inline std::string remove_vietnamese_accents(const char* str) {
     return result;
 }
 
-inline void print_qms_ticket(ThermalPrinter &printer, const char* unitName, const char* serviceName, const char* ticketNum, const char* customTime = nullptr, const char* customDate = nullptr) {
+inline void print_qms_ticket(ThermalPrinter &printer,
+                             const char* unitName,
+                             const char* serviceName,
+                             const char* ticketNum,
+                             const char* callingTicket = nullptr,
+                             const char* customTime = nullptr,
+                             const char* customDate = nullptr) {
     // Convert Vietnamese accented strings to non-accented ASCII
     std::string cleanUnit = remove_vietnamese_accents(unitName && strlen(unitName) > 0 ? unitName : "HE THONG XEP HANG TU DONG");
     std::string cleanService = remove_vietnamese_accents(serviceName && strlen(serviceName) > 0 ? serviceName : "DICH VU");
+    std::string cleanCalling = (callingTicket && strlen(callingTicket) > 0) ? remove_vietnamese_accents(callingTicket) : "---";
 
-    // 1. Reset cài đặt
+    // 1. Reset & Header (Tên Đơn vị & Dịch vụ)
     printer.resetSettings();
-    
-    // 2. In Tiêu đề Đơn vị (Header Style)
     printer.useHeaderStyle();
+    printer.setLineSpacing(50);
     printer.println(cleanUnit.c_str());
-    
-    printer.resetSettings();
-    printer.setAlignment(ThermalPrinter::CENTER);
-    printer.setLineSpacing(30);
-    printer.println("------------------------------------------");
-    
-    // 3. In Tên Dịch vụ
+
     printer.useBodyStyle();
     printer.setAlignment(ThermalPrinter::CENTER);
     printer.setSize(2);
     printer.setBold(true);
+    printer.setLineSpacing(45);
     printer.println(cleanService.c_str());
-    
-    // 4. In Số thứ tự (Size lớn nhất)
+
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(30);
+    printer.println("------------------------------------------");
+
+    // 2. Nhãn "SO THU TU" + Số thứ tự cỡ lớn
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setSize(2);
+    printer.setBold(true);
+    printer.setLineSpacing(45);
+    printer.println("SO THU TU");
+
     printer.resetSettings();
     printer.setAlignment(ThermalPrinter::CENTER);
     printer.setSize(4); // Cỡ rất lớn cho số thứ tự (Khổ 80mm)
     printer.setBold(true);
     printer.setLineSpacing(80);
     printer.println(ticketNum ? ticketNum : "000");
-    
+
     printer.resetSettings();
     printer.setAlignment(ThermalPrinter::CENTER);
     printer.setLineSpacing(30);
     printer.println("------------------------------------------");
-    
-    // 5. In Thời gian
+
+    // 3. Dòng STT Đang Gọi (In thêm theo yêu cầu)
     printer.useBodyStyle();
     printer.setAlignment(ThermalPrinter::CENTER);
-    
-    char timePrintBuf[64];
+    printer.setSize(2);
+    printer.setBold(true);
+    printer.setLineSpacing(45);
+    char callBuf[64];
+    snprintf(callBuf, sizeof(callBuf), "STT dang goi: %s", cleanCalling.c_str());
+    printer.println(callBuf);
+
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(30);
+    printer.println("------------------------------------------");
+
+    // 4. Lời dặn / Hướng dẫn
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setSize(1);
+    printer.setLineSpacing(45);
+    printer.println("QUY KHACH vui long cho duoc phuc vu theo");
+    printer.println("STT hien tren bang dien tu. Xin cam on!");
+
+    // 5. Dòng Thời Gian In Phiếu (STT được in lúc: HH:MM:SS ngày DD/MM/YYYY)
+    char timePrintBuf[96];
     if (customTime && strlen(customTime) > 0 && customDate && strlen(customDate) > 0) {
-        snprintf(timePrintBuf, sizeof(timePrintBuf), "Ngay in: %s %s", customDate, customTime);
+        snprintf(timePrintBuf, sizeof(timePrintBuf), "STT duoc in luc: %s ngay %s", customTime, customDate);
     } else if (customTime && strlen(customTime) > 0) {
-        snprintf(timePrintBuf, sizeof(timePrintBuf), "Gio in: %s", customTime);
+        snprintf(timePrintBuf, sizeof(timePrintBuf), "STT duoc in luc: %s", customTime);
     } else {
         // Fallback: System time
         time_t now;
@@ -140,13 +173,12 @@ inline void print_qms_ticket(ThermalPrinter &printer, const char* unitName, cons
         setenv("TZ", "CST-7", 1);
         tzset();
         localtime_r(&now, &timeinfo);
-        strftime(timePrintBuf, sizeof(timePrintBuf), "Ngay in: %d/%m/%Y %H:%M:%S", &timeinfo);
+        strftime(timePrintBuf, sizeof(timePrintBuf), "STT duoc in luc: %H:%M:%S ngay %d/%m/%Y", &timeinfo);
     }
-    
+
+    printer.println("");
     printer.println(timePrintBuf);
-    printer.println("Vui long doi den luot phuc vu.");
-    printer.println("Xin cam on!");
-    
+
     // 6. Cắt giấy
     printer.println("\n\n\n\n\n");
     printer.cut();

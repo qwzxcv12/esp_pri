@@ -229,6 +229,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                             cJSON *u_name = cJSON_GetObjectItem(target, "unit_name");
                             const char *unit = (u_name && u_name->valuestring) ? u_name->valuestring : g_unit_name;
 
+                            cJSON *c_num = cJSON_GetObjectItem(target, "calling_ticket");
+                            const char *calling = (c_num && c_num->valuestring) ? c_num->valuestring : "---";
+
                             cJSON *t_time = cJSON_GetObjectItem(target, "time");
                             cJSON *t_date = cJSON_GetObjectItem(target, "date");
 
@@ -237,8 +240,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                             const char *time_val = (t_time && t_time->valuestring) ? t_time->valuestring : nullptr;
                             const char *date_val = (t_date && t_date->valuestring) ? t_date->valuestring : nullptr;
 
-                            add_device_log(">>> IN PHIẾU TỪ SERVER: Số %s - %s (%s %s)", ticket, service, date_val ? date_val : "", time_val ? time_val : "");
-                            print_qms_ticket(g_printer, unit, service, ticket, time_val, date_val);
+                            add_device_log(">>> IN PHIẾU TỪ SERVER: Số %s (Đang gọi: %s, %s %s)", ticket, calling, date_val ? date_val : "", time_val ? time_val : "");
+                            print_qms_ticket(g_printer, unit, service, ticket, calling, time_val, date_val);
                             processed = true;
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                             add_device_log(">>> COMMAND: Clear screen");

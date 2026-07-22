@@ -810,7 +810,7 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
                             const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
                             const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
                             add_device_log(">>> PRINTING TICKET VIA WEB: Ticket=%s, Service=%s", ticket ? ticket : "N/A", service ? service : "N/A");
-                            print_qms_ticket(g_printer, g_unit_name, service, ticket, cust_name);
+                            print_qms_ticket(g_printer, g_unit_name, service, ticket, "---");
                             local_processed = true;
                         }
                     }
@@ -851,7 +851,7 @@ static esp_err_t api_test_print_get_handler(httpd_req_t *req)
         return ESP_OK;
     }
     add_device_log(">>> TEST PRINT INITIATED FROM WEB API <<<");
-    print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "KHACH HANG TEST");
+    print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "---");
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_sendstr(req, "Test print sent to UART2 printer!");
@@ -1152,7 +1152,7 @@ void print_ticket_by_service_id(int service_id, const char* customer_name = "Nú
     snprintf(ticket_num, sizeof(ticket_num), "%03d", s_local_ticket_counter[sid_idx]);
     
     add_device_log(">>> IN PHIẾU NÚT BẤM (Service ID: %d): Số %s - %s", service_id, ticket_num, service_name);
-    print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, customer_name);
+    print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, "---");
 }
 
 // ==================== BUTTON TASK ====================
