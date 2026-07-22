@@ -1026,16 +1026,22 @@ static esp_err_t api_scan_wifi_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static int g_ap_config_counter = 180;
+
+inline void reset_wifi_config_counter(void) {
+    g_ap_config_counter = 180;
+}
+
 // AP Mode Timeout Monitor (Tasmota Style: 180 seconds auto-restart)
 static void ap_timeout_task(void *pvParameters) {
-    int seconds_left = 180;
-    add_device_log("AP Mode Timeout Monitor active (%d seconds left)", seconds_left);
-    while (g_in_ap_mode && seconds_left > 0) {
+    g_ap_config_counter = 180;
+    add_device_log("AP Mode Timeout Monitor active (%d seconds timeout)", g_ap_config_counter);
+    while (g_in_ap_mode && g_ap_config_counter > 0) {
         vTaskDelay(pdMS_TO_TICKS(1000));
-        seconds_left--;
+        g_ap_config_counter--;
     }
-    if (g_in_ap_mode && seconds_left <= 0) {
-        add_device_log("AP Timeout reached (180s). Restarting device to retry STA connection...");
+    if (g_in_ap_mode && g_ap_config_counter <= 0) {
+        add_device_log("AP Timeout reached (180s inactive). Restarting device to retry STA connection...");
         vTaskDelay(pdMS_TO_TICKS(1000));
         esp_restart();
     }
