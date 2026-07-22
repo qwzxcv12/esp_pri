@@ -225,18 +225,99 @@ const char* log_page = R"html(
         }
         .btn--primary:hover { background: #ffc578; }
         
+        .log-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: #0d1117;
+            border-bottom: 1px solid var(--line);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .log-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .log-badge {
+            background: rgba(255, 180, 84, 0.15);
+            color: var(--accent);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10.5px;
+        }
+        .log-tools {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .log-tools select {
+            padding: 5px 8px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text);
+            background: var(--ink);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        .btn-sm {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-sm:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--muted);
+        }
+        .btn-accent {
+            background: var(--accent-dim);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        .btn-accent:hover {
+            background: var(--accent);
+            color: var(--ink);
+        }
         .log-container {
-            flex: 1;
-            padding: 24px 16px;
-            overflow-y: scroll;
+            height: 380px;
+            max-height: 50vh;
+            padding: 14px 16px;
             overflow-y: auto;
             background: #070a0e;
             font-family: var(--mono);
-            font-size: 12.5px;
+            font-size: 12px;
             line-height: 1.6;
             color: #ffb454;
             white-space: pre-wrap;
             border-bottom: 1px solid var(--line);
+        }
+        .log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: #070a0e;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background: #232b35;
+            border-radius: 3px;
+        }
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
         }
         
         /* Log Console Control */
@@ -350,6 +431,24 @@ const char* log_page = R"html(
             <a href="/ota" class="nav-item">Update</a>
         </div>
 
+        <!-- Log Header Controls -->
+        <div class="log-header-bar">
+            <div class="log-title">
+                <span>📟</span> LOG CONSOLE
+                <span id="logCountBadge" class="log-badge">0 dòng</span>
+            </div>
+            <div class="log-tools">
+                <select id="logLimitSelect" onchange="renderLogs()">
+                    <option value="30" selected>30 dòng mới nhất</option>
+                    <option value="50">50 dòng mới nhất</option>
+                    <option value="100">100 dòng (Tất cả)</option>
+                </select>
+                <button type="button" class="btn-sm" id="pauseBtn" onclick="togglePause()">⏸ Tạm dừng</button>
+                <button type="button" class="btn-sm" onclick="clearDisplay()">🧹 Xóa</button>
+                <button type="button" class="btn-sm btn-accent" onclick="copyLogs()">📋 Copy Log</button>
+            </div>
+        </div>
+
         <div class="log-container" id="logBox">Loading device logs...</div>
 
         <!-- Ô nhập lệnh gửi trực tiếp -->
@@ -374,8 +473,6 @@ const char* log_page = R"html(
                     <input type="text" id="kioskCustName" placeholder="Customer Name (Default: Guest)" style="flex: 1;">
                     <button class="btn btn--primary" onclick="getTicket()" style="padding: 10px 20px; background-color: var(--ok); color: var(--ink);">2. Get Ticket</button>
                 </div>
-            </div>
-
             </div>
         </div>
 
@@ -508,13 +605,71 @@ const char* log_page = R"html(
             statusBox.style.color = 'var(--ok)';
         }
 
+        let rawLogData = "";
+        let isPaused = false;
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pauseBtn');
+            if (isPaused) {
+                btn.textContent = "▶ Tiếp tục";
+                btn.style.color = "var(--accent)";
+            } else {
+                btn.textContent = "⏸ Tạm dừng";
+                btn.style.color = "var(--text)";
+                fetchLogs();
+            }
+        }
+
+        function clearDisplay() {
+            rawLogData = "";
+            const logBox = document.getElementById('logBox');
+            if (logBox) logBox.textContent = "Console cleared.";
+            const badge = document.getElementById('logCountBadge');
+            if (badge) badge.textContent = "0 dòng";
+        }
+
+        function renderLogs() {
+            const logBox = document.getElementById('logBox');
+            if (!logBox) return;
+
+            if (!rawLogData || rawLogData.trim() === "") {
+                logBox.textContent = "No logs available.";
+                const badge = document.getElementById('logCountBadge');
+                if (badge) badge.textContent = "0 dòng";
+                return;
+            }
+
+            let lines = rawLogData.trim().split('\n');
+            const limitSelect = document.getElementById('logLimitSelect');
+            const limit = limitSelect ? parseInt(limitSelect.value) : 30;
+
+            const totalLines = lines.length;
+            if (lines.length > limit) {
+                lines = lines.slice(lines.length - limit);
+            }
+
+            const badge = document.getElementById('logCountBadge');
+            if (badge) {
+                badge.textContent = lines.length < totalLines ? `${lines.length}/${totalLines} dòng` : `${lines.length} dòng`;
+            }
+
+            const isAtBottom = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 60;
+
+            logBox.textContent = lines.join('\n');
+
+            if (isAtBottom) {
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+        }
+
         function copyLogs() {
             const logBox = document.getElementById('logBox');
             if (!logBox) return;
             const textToCopy = logBox.innerText;
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
-                    alert("Đã copy toàn bộ log!");
+                    alert("Đã copy log đang hiển thị!");
                 }).catch(err => {
                     alert("Lỗi khi copy: " + err);
                 });
@@ -525,7 +680,7 @@ const char* log_page = R"html(
                 textArea.select();
                 try {
                     document.execCommand('copy');
-                    alert("Đã copy toàn bộ log!");
+                    alert("Đã copy log đang hiển thị!");
                 } catch (err) {
                     alert("Lỗi khi copy: " + err);
                 }
@@ -533,18 +688,18 @@ const char* log_page = R"html(
             }
         }
 
-
         function fetchLogs() {
-            const logBox = document.getElementById('logBox');
+            if (isPaused) return;
             fetch('/log_data')
                 .then(response => response.text())
                 .then(data => {
-                    logBox.textContent = data ? data : "No logs available.";
-                    logBox.scrollTop = logBox.scrollHeight;
-                    parseServicesFromLog(data);
+                    rawLogData = data ? data : "";
+                    renderLogs();
+                    parseServicesFromLog(rawLogData);
                 })
                 .catch(err => {
-                    logBox.textContent = "Error loading logs from device: " + err;
+                    const logBox = document.getElementById('logBox');
+                    if (logBox) logBox.textContent = "Error loading logs from device: " + err;
                 });
         }
         
