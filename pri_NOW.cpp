@@ -21,6 +21,8 @@
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
 #include "thermal_printer.h"
+#include "lwip/sockets.h"
+#include "lwip/netdb.h"
 
 ThermalPrinter g_printer(UART_NUM_2);
 char g_unit_name[128] = "HE THONG XEP HANG";
@@ -913,6 +915,133 @@ static esp_err_t api_gpio_config_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static bool g_in_ap_mode = false;
+
+static int wifi_rssi_to_quality(int rssi) {
+    if (rssi <= -100) return 0;
+    if (rssi >= -50) return 100;
+    return 2 * (rssi + 100);
+}
+
+// DNS Server Task for Tasmota-style Automatic Captive Portal Pop-up
+static void dns_server_task(void *pvParameters) {
+    uint8_t rx_buffer[128];
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    if (sock < 0) {
+        add_device_log("DNS Server: Socket creation failed");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(53); // Port 53 DNS
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        add_device_log("DNS Server: Port 53 bind failed");
+        close(sock);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    add_device_log("DNS Server (Captive Portal) running on port 53");
+
+    while (g_in_ap_mode) {
+        int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (len > 12) {
+            uint8_t reply[256];
+            memcpy(reply, rx_buffer, len);
+            reply[2] |= 0x80; // QR = 1
+            reply[3] |= 0x80; // RA = 1
+            reply[6] = 0x00; reply[7] = 0x01; // Answer Count = 1
+
+            int idx = len;
+            reply[idx++] = 0xc0; reply[idx++] = 0x0c;
+            reply[idx++] = 0x00; reply[idx++] = 0x01; // Type A
+            reply[idx++] = 0x00; reply[idx++] = 0x01; // Class IN
+            reply[idx++] = 0x00; reply[idx++] = 0x00; reply[idx++] = 0x00; reply[idx++] = 0x3c; // TTL 60s
+            reply[idx++] = 0x00; reply[idx++] = 0x04; // RDLENGTH 4
+            reply[idx++] = 192;  reply[idx++] = 168; reply[idx++] = 4;    reply[idx++] = 1;   // 192.168.4.1
+
+            sendto(sock, reply, idx, 0, (struct sockaddr *)&client_addr, client_addr_len);
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    close(sock);
+    vTaskDelete(NULL);
+}
+
+// Captive Portal 302 Redirect Handler
+static esp_err_t captive_portal_redirect_handler(httpd_req_t *req) {
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+    httpd_resp_sendstr(req, "Redirecting to WiFi Setup...");
+    return ESP_OK;
+}
+
+// WiFi Scan API Endpoint (/api/scan-wifi)
+static esp_err_t api_scan_wifi_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json; charset=utf-8");
+    httpd_resp_set_hdr(req, "Connection", "close");
+
+    wifi_scan_config_t scan_config = {};
+    scan_config.show_hidden = false;
+    scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+
+    esp_wifi_scan_start(&scan_config, true);
+
+    uint16_t number = 16;
+    wifi_ap_record_t ap_records[16];
+    esp_wifi_scan_get_ap_records(&number, ap_records);
+
+    cJSON *root = cJSON_CreateArray();
+    for (int i = 0; i < number; i++) {
+        if (strlen((char*)ap_records[i].ssid) > 0) {
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "ssid", (char*)ap_records[i].ssid);
+            cJSON_AddNumberToObject(item, "rssi", ap_records[i].rssi);
+            cJSON_AddNumberToObject(item, "quality", wifi_rssi_to_quality(ap_records[i].rssi));
+            
+            const char* auth_str = "OPEN";
+            if (ap_records[i].authmode == WIFI_AUTH_WEP) auth_str = "WEP";
+            else if (ap_records[i].authmode == WIFI_AUTH_WPA_PSK) auth_str = "WPA";
+            else if (ap_records[i].authmode == WIFI_AUTH_WPA2_PSK) auth_str = "WPA2";
+            else if (ap_records[i].authmode == WIFI_AUTH_WPA_WPA2_PSK) auth_str = "WPA/WPA2";
+            else if (ap_records[i].authmode == WIFI_AUTH_WPA3_PSK) auth_str = "WPA3";
+            cJSON_AddStringToObject(item, "auth", auth_str);
+
+            cJSON_AddItemToArray(root, item);
+        }
+    }
+
+    char *json_str = cJSON_PrintUnformatted(root);
+    httpd_resp_send(req, json_str, strlen(json_str));
+    free(json_str);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+// AP Mode Timeout Monitor (Tasmota Style: 180 seconds auto-restart)
+static void ap_timeout_task(void *pvParameters) {
+    int seconds_left = 180;
+    add_device_log("AP Mode Timeout Monitor active (%d seconds left)", seconds_left);
+    while (g_in_ap_mode && seconds_left > 0) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        seconds_left--;
+    }
+    if (g_in_ap_mode && seconds_left <= 0) {
+        add_device_log("AP Timeout reached (180s). Restarting device to retry STA connection...");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+    }
+    vTaskDelete(NULL);
+}
+
 // ==================== BUTTON TASK ====================
 static void button_task(void *pvParameters) {
     // Parse saved JSON and configure pins
@@ -1148,6 +1277,29 @@ static httpd_handle_t start_webserver(void)
         };
         httpd_register_uri_handler(server, &api_ota_check);
 
+        httpd_uri_t api_scan_wifi = {
+            .uri       = "/api/scan-wifi",
+            .method    = HTTP_GET,
+            .handler   = api_scan_wifi_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_scan_wifi);
+
+        // Tasmota-style Captive Portal HTTP Redirect Endpoints for iOS/Android/Windows
+        const char* captive_uris[] = {
+            "/generate_204", "/gen_204", "/connecttest.txt", "/redirect",
+            "/hotspot-detect.html", "/canonical.html", "/library/test/success.html", "/nconnect.txt"
+        };
+        for (size_t i = 0; i < sizeof(captive_uris) / sizeof(captive_uris[0]); i++) {
+            httpd_uri_t redirect_uri = {
+                .uri       = captive_uris[i],
+                .method    = HTTP_GET,
+                .handler   = captive_portal_redirect_handler,
+                .user_ctx  = NULL
+            };
+            httpd_register_uri_handler(server, &redirect_uri);
+        }
+
 
         httpd_uri_t ota_get = {
             .uri       = "/ota",
@@ -1302,6 +1454,7 @@ extern "C" void app_main(void)
     }
 
     if (!connected) {
+        g_in_ap_mode = true;
         add_device_log("Starting Access Point and Captive Portal...");
         
         esp_wifi_stop();
@@ -1319,9 +1472,13 @@ extern "C" void app_main(void)
         ESP_ERROR_CHECK(esp_wifi_start());
 
         add_device_log("AP Mode started. SSID: %s", ap_ssid);
-        add_device_log("Connect to AP and open http://192.168.4.1");
+        add_device_log("Connect to AP - Captive Portal active at http://192.168.4.1");
 
         start_webserver();
+
+        // Start Tasmota-style DNS Server & AP Timeout Tasks
+        xTaskCreate(dns_server_task, "dns_task", 3072, NULL, 5, NULL);
+        xTaskCreate(ap_timeout_task, "ap_timeout_task", 2048, NULL, 5, NULL);
     } else {
         add_device_log("Starting Web Server in Station mode...");
         start_webserver();
