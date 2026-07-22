@@ -317,6 +317,21 @@ const char* gpio_page = R"html(
                 </select>
             </div>
             
+            <div style="margin-top: 18px; margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+                <span style="font-weight: bold; color: var(--accent);">PRINTER CONFIGURATION (UART2)</span>
+            </div>
+            
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <div style="flex: 1;">
+                    <label style="color: var(--muted); font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px;">PRINTER TX (ESP TX &rarr; Printer RX):</label>
+                    <select id="printerTxPin" style="width: 100%;"></select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: var(--muted); font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px;">PRINTER RX (ESP RX &rarr; Printer TX):</label>
+                    <select id="printerRxPin" style="width: 100%;"></select>
+                </div>
+            </div>
+
             <div style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
                 <span style="font-weight: bold; color: var(--accent);">BUTTON MAPPINGS</span>
             </div>
@@ -412,11 +427,16 @@ const char* gpio_page = R"html(
             }
         }
         
+        let savedPrinterTx = 18;
+        let savedPrinterRx = 17;
+        
         async function fetchConfig() {
             try {
                 const res = await fetch('/api/gpio_config');
                 const conf = await res.json();
                 if (conf.board) document.getElementById('boardType').value = conf.board;
+                if (conf.printer_tx !== undefined) savedPrinterTx = conf.printer_tx;
+                if (conf.printer_rx !== undefined) savedPrinterRx = conf.printer_rx;
                 if (conf.mappings) currentMappings = conf.mappings;
                 renderAll();
             } catch (e) {
@@ -448,6 +468,23 @@ const char* gpio_page = R"html(
         }
 
         function renderAll() {
+            const safePins = getSafePins();
+
+            // Populate Printer TX and RX selects
+            const txSelect = document.getElementById('printerTxPin');
+            const rxSelect = document.getElementById('printerRxPin');
+            if (txSelect && rxSelect) {
+                const currentTx = txSelect.value ? parseInt(txSelect.value) : savedPrinterTx;
+                const currentRx = rxSelect.value ? parseInt(rxSelect.value) : savedPrinterRx;
+                
+                txSelect.innerHTML = '';
+                rxSelect.innerHTML = '';
+                safePins.forEach(p => {
+                    txSelect.innerHTML += `<option value="${p}" ${p === currentTx ? 'selected' : ''}>GPIO ${p}${p === 18 ? ' (Default)' : ''}</option>`;
+                    rxSelect.innerHTML += `<option value="${p}" ${p === currentRx ? 'selected' : ''}>GPIO ${p}${p === 17 ? ' (Default)' : ''}</option>`;
+                });
+            }
+
             const container = document.getElementById('mappingContainer');
             container.innerHTML = '';
             
@@ -455,8 +492,6 @@ const char* gpio_page = R"html(
                 container.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 24px 0;">No buttons mapped.</div>';
                 return;
             }
-            
-            const safePins = getSafePins();
             
             currentMappings.forEach((map, index) => {
                 const row = document.createElement('div');
@@ -488,15 +523,30 @@ const char* gpio_page = R"html(
         }
         
         async function saveConfig() {
-            // Validate duplicates
+            const pTx = parseInt(document.getElementById('printerTxPin').value);
+            const pRx = parseInt(document.getElementById('printerRxPin').value);
+
+            if (pTx === pRx) {
+                alert("Error: Printer TX and Printer RX cannot use the same GPIO pin.");
+                return;
+            }
+
+            // Validate duplicates for button pins
             const pins = currentMappings.map(m => m.pin);
             if (new Set(pins).size !== pins.length) {
-                alert("Error: Duplicate GPIO pins selected. A pin can only trigger one service.");
+                alert("Error: Duplicate GPIO pins selected for buttons. A pin can only trigger one service.");
+                return;
+            }
+
+            if (pins.includes(pTx) || pins.includes(pRx)) {
+                alert("Error: GPIO pins assigned to Printer TX/RX cannot be reused for buttons.");
                 return;
             }
             
             const payload = {
                 board: document.getElementById('boardType').value,
+                printer_tx: pTx,
+                printer_rx: pRx,
                 mappings: currentMappings
             };
             

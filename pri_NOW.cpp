@@ -29,7 +29,22 @@
 ThermalPrinter g_printer(UART_NUM_2);
 char g_unit_name[128] = "HE THONG XEP HANG";
 
+esp_err_t read_gpio_config(char* json_str, size_t max_len);
+
 void init_thermal_printer() {
+    int tx_pin = 18;
+    int rx_pin = 17;
+    char saved_json[1024] = {0};
+    if (read_gpio_config(saved_json, sizeof(saved_json)) == ESP_OK && strlen(saved_json) > 0) {
+        cJSON *root = cJSON_Parse(saved_json);
+        if (root) {
+            cJSON *tx = cJSON_GetObjectItem(root, "printer_tx");
+            cJSON *rx = cJSON_GetObjectItem(root, "printer_rx");
+            if (tx && cJSON_IsNumber(tx)) tx_pin = tx->valueint;
+            if (rx && cJSON_IsNumber(rx)) rx_pin = rx->valueint;
+            cJSON_Delete(root);
+        }
+    }
     uart_config_t uart_config;
     memset(&uart_config, 0, sizeof(uart_config_t));
     uart_config.baud_rate = 9600;
@@ -39,9 +54,9 @@ void init_thermal_printer() {
     uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
     uart_config.source_clk = UART_SCLK_DEFAULT;
     uart_param_config(UART_NUM_2, &uart_config);
-    uart_set_pin(UART_NUM_2, GPIO_NUM_18, GPIO_NUM_17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(UART_NUM_2, (gpio_num_t)tx_pin, (gpio_num_t)rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_driver_install(UART_NUM_2, 1024, 2048, 0, NULL, 0);
-    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=18, RX=17 (Baud: 9600, TX Buf: 2048)");
+    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=%d, RX=%d (Baud: 9600, TX Buf: 2048)", tx_pin, rx_pin);
 }
 #include <mutex>
 
@@ -1673,9 +1688,6 @@ extern "C" void app_main(void)
 {
     // Initialize Arduino Core
     initArduino();
-    
-    // Khởi tạo UART máy in nhiệt
-    init_thermal_printer();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -1686,6 +1698,9 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "NVS Storage Initialized");
+
+    // Khởi tạo UART máy in nhiệt (sau khi NVS đã được khởi tạo để đọc chân TX/RX)
+    init_thermal_printer();
 
     // Initialize LED Display
 // Initialize Network and Events
