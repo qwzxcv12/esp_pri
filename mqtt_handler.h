@@ -101,7 +101,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_client_handle_t client = event->client;
 
     switch ((esp_mqtt_event_id_t)event_id) {
-    case MQTT_EVENT_CONNECTED:
+    case MQTT_EVENT_CONNECTED: {
         add_device_log("MQTT CONNECTED to broker!");
 
         if (strlen(g_mqtt_topic) > 0) {
@@ -153,6 +153,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             add_device_log("Sent get_config request: msg_id=%d", msg_id3);
         }
         break;
+    }
 
     case MQTT_EVENT_DISCONNECTED:
         add_device_log("MQTT DISCONNECTED. Reconnecting...");
