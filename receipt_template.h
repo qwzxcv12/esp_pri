@@ -153,21 +153,35 @@ inline void print_qms_ticket(ThermalPrinter &printer, const char* unitName, cons
 }
 
 inline void print_startup_test_ticket(ThermalPrinter &printer, const char* dev_id, const char* ip_str, const char* wifi_ssid, const char* mqtt_host, bool mqtt_connected) {
+    (void)mqtt_host;
+
     printer.resetSettings();
     printer.useHeaderStyle();
+    printer.setLineSpacing(60);
     printer.println("THIET BI KHOI DONG");
     
     printer.resetSettings();
     printer.setAlignment(ThermalPrinter::CENTER);
-    printer.setLineSpacing(30);
+    printer.setLineSpacing(45);
     printer.println("------------------------------------------");
     
     printer.useBodyStyle();
     printer.setAlignment(ThermalPrinter::LEFT);
     printer.setSize(1);
+    printer.setLineSpacing(55);
+    
+    char short_id[16] = {0};
+    if (dev_id && strlen(dev_id) >= 12) {
+        strncpy(short_id, dev_id, 12);
+        short_id[12] = '\0';
+    } else if (dev_id && strlen(dev_id) > 0) {
+        strncpy(short_id, dev_id, sizeof(short_id) - 1);
+    } else {
+        strcpy(short_id, "N/A");
+    }
     
     char buf[128];
-    snprintf(buf, sizeof(buf), "Device ID: %s", (dev_id && strlen(dev_id) > 0) ? dev_id : "N/A");
+    snprintf(buf, sizeof(buf), "Device ID: %s...", short_id);
     printer.println(buf);
     
     snprintf(buf, sizeof(buf), "WiFi SSID: %s", (wifi_ssid && strlen(wifi_ssid) > 0) ? wifi_ssid : "AP Mode");
@@ -176,29 +190,17 @@ inline void print_startup_test_ticket(ThermalPrinter &printer, const char* dev_i
     snprintf(buf, sizeof(buf), "IP Addr  : %s", (ip_str && strlen(ip_str) > 0) ? ip_str : "N/A");
     printer.println(buf);
     
-    snprintf(buf, sizeof(buf), "MQTT Host: %s", (mqtt_host && strlen(mqtt_host) > 0) ? mqtt_host : "N/A");
-    printer.println(buf);
-    
     snprintf(buf, sizeof(buf), "MQTT Stat: %s", mqtt_connected ? "CONNECTED" : "READY");
     printer.println(buf);
     
     printer.resetSettings();
     printer.setAlignment(ThermalPrinter::CENTER);
-    printer.setLineSpacing(30);
+    printer.setLineSpacing(45);
     printer.println("------------------------------------------");
     
     printer.useBodyStyle();
     printer.setAlignment(ThermalPrinter::CENTER);
-    
-    time_t now;
-    struct tm timeinfo;
-    time(&now);
-    setenv("TZ", "CST-7", 1);
-    tzset();
-    localtime_r(&now, &timeinfo);
-    char timeStr[64];
-    strftime(timeStr, sizeof(timeStr), "K.Dong: %d/%m/%Y %H:%M:%S", &timeinfo);
-    printer.println(timeStr);
+    printer.setLineSpacing(55);
     printer.println("DA SAN SANG KET NOI & HOAT DONG");
     
     printer.println("\n\n\n\n\n");
