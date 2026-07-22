@@ -57,7 +57,7 @@ jobs:
           cp sdkconfig.defaults project/
           cp partitions.csv project/ || true
 
-          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude($ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject($projectName)\n' > project/CMakeLists.txt
+          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude(\$ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject($projectName)\n' > project/CMakeLists.txt
 
           git clone --depth 1 -b release/v3.0.x https://github.com/espressif/arduino-esp32.git project/components/arduino
 
@@ -235,8 +235,13 @@ if (-not (Test-Path $bootloaderBin) -or -not (Test-Path $partitionBin) -or -not 
     exit 1
 }
 
+$otaDataBin = "ota_data_initial.bin"
 Write-Host "`n>>> Flashing firmware to ESP32-S3 on port $comPort..." -ForegroundColor Cyan
-& $esptoolExe --chip esp32s3 --port $comPort --baud $baudRate write_flash 0x0 $bootloaderBin 0x8000 $partitionBin 0x10000 $appBin
+if (Test-Path $otaDataBin) {
+    & $esptoolExe --chip esp32s3 --port $comPort --baud $baudRate write_flash 0x0 $bootloaderBin 0x8000 $partitionBin 0xe000 $otaDataBin 0x10000 $appBin
+} else {
+    & $esptoolExe --chip esp32s3 --port $comPort --baud $baudRate write_flash 0x0 $bootloaderBin 0x8000 $partitionBin 0x10000 $appBin
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n========================================================" -ForegroundColor Green
