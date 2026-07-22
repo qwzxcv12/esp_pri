@@ -471,7 +471,8 @@ const char* log_page = R"html(
                 </div>
                 <div class="log-control__row">
                     <input type="text" id="kioskCustName" placeholder="Customer Name (Default: Guest)" style="flex: 1;">
-                    <button class="btn btn--primary" onclick="getTicket()" style="padding: 10px 20px; background-color: var(--ok); color: var(--ink);">2. Get Ticket</button>
+                    <button class="btn btn--primary" onclick="getTicket()" style="padding: 10px 16px; background-color: var(--ok); color: var(--ink);">2. Get Ticket</button>
+                    <button class="btn btn--primary" onclick="testPrint()" style="padding: 10px 14px; background-color: #ffb454; color: var(--ink);">🖨 Test Print</button>
                 </div>
             </div>
         </div>
@@ -547,6 +548,23 @@ const char* log_page = R"html(
                 statusBox.textContent = "Connection error: " + err;
                 statusBox.style.color = '#ff6b6b';
             });
+        }
+
+        function testPrint() {
+            const statusBox = document.getElementById('kioskStatus');
+            statusBox.textContent = "Sending test print to printer...";
+            statusBox.style.color = 'var(--accent)';
+            fetch('/api/test_print')
+                .then(res => res.text())
+                .then(msg => {
+                    statusBox.textContent = msg;
+                    statusBox.style.color = 'var(--ok)';
+                    setTimeout(fetchLogs, 500);
+                })
+                .catch(err => {
+                    statusBox.textContent = "Test print error: " + err;
+                    statusBox.style.color = '#ff6b6b';
+                });
         }
 
         function parseServicesFromLog(logData) {

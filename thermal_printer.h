@@ -93,11 +93,16 @@ public:
         sendByte(_currentSettings.charSpacing);
     }
     
+    void flush() {
+        uart_wait_tx_done(_uart_num, pdMS_TO_TICKS(1000));
+    }
+
     void cut(bool partial = true) {
         sendByte(GS);
         sendByte(0x56);
         sendByte(66);
         sendByte(partial ? 1 : 0);
+        flush();
     }
     
     void print(const char* str) {

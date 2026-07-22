@@ -38,8 +38,8 @@ void init_thermal_printer() {
     uart_config.source_clk = UART_SCLK_DEFAULT;
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, GPIO_NUM_17, GPIO_NUM_18, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    uart_driver_install(UART_NUM_2, 256, 0, 0, NULL, 0);
-    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18");
+    uart_driver_install(UART_NUM_2, 1024, 2048, 0, NULL, 0);
+    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18 (Baud: 9600, TX Buf: 2048)");
 }
 #include <mutex>
 
@@ -795,6 +795,16 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
                         }
                     } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                         local_processed = true;
+                    } else if (strcmp(cmd->valuestring, "print_ticket") == 0) {
+                        cJSON *data = cJSON_GetObjectItem(root, "data");
+                        if (data) {
+                            const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
+                            const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
+                            const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+                            add_device_log(">>> PRINTING TICKET VIA WEB: Ticket=%s, Service=%s", ticket ? ticket : "N/A", service ? service : "N/A");
+                            print_qms_ticket(g_printer, g_unit_name, service, ticket, cust_name);
+                            local_processed = true;
+                        }
                     }
                 }
                 cJSON_Delete(root);
@@ -824,6 +834,20 @@ static esp_err_t publish_post_handler(httpd_req_t *req)
 
     httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing topic or payload");
     return ESP_FAIL;
+}
+
+static esp_err_t api_test_print_get_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) {
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized");
+        return ESP_OK;
+    }
+    add_device_log(">>> TEST PRINT INITIATED FROM WEB API <<<");
+    print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "KHACH HANG TEST");
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_sendstr(req, "Test print sent to UART2 printer!");
+    return ESP_OK;
 }
 
 static esp_err_t login_get_handler(httpd_req_t *req)
@@ -1343,7 +1367,13 @@ static httpd_handle_t start_webserver(void)
             .handler   = api_scan_wifi_get_handler,
             .user_ctx  = NULL
         };
-        httpd_register_uri_handler(server, &api_scan_wifi);
+        httpd_uri_t api_test_print = {
+            .uri       = "/api/test_print",
+            .method    = HTTP_GET,
+            .handler   = api_test_print_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_test_print);
 
         // Tasmota-style Captive Portal HTTP Redirect Endpoints for iOS/Android/Windows
         const char* captive_uris[] = {
