@@ -57,7 +57,7 @@ jobs:
           cp sdkconfig.defaults project/
           cp partitions.csv project/ || true
 
-          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude(\$ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject($projectName)\n' > project/CMakeLists.txt
+          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude(`$ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject($projectName)\n' > project/CMakeLists.txt
 
           git clone --depth 1 -b release/v3.0.x https://github.com/espressif/arduino-esp32.git project/components/arduino
 

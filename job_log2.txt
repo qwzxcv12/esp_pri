@@ -1,0 +1,276 @@
+﻿2026-07-22T04:34:17.0470967Z Current runner version: '2.336.0'
+2026-07-22T04:34:17.0488399Z ##[group]Runner Image Provisioner
+2026-07-22T04:34:17.0489107Z Hosted Compute Agent
+2026-07-22T04:34:17.0489512Z Version: 20260707.563
+2026-07-22T04:34:17.0489943Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-22T04:34:17.0490450Z Build Date: 2026-07-07T19:33:50Z
+2026-07-22T04:34:17.0490927Z Worker ID: {94e8eec1-76a7-467d-9050-56f16c977fb0}
+2026-07-22T04:34:17.0491392Z Azure Region: centralus
+2026-07-22T04:34:17.0491805Z ##[endgroup]
+2026-07-22T04:34:17.0492777Z ##[group]Operating System
+2026-07-22T04:34:17.0493227Z Ubuntu
+2026-07-22T04:34:17.0493615Z 24.04.4
+2026-07-22T04:34:17.0493966Z LTS
+2026-07-22T04:34:17.0494327Z ##[endgroup]
+2026-07-22T04:34:17.0494687Z ##[group]Runner Image
+2026-07-22T04:34:17.0495116Z Image: ubuntu-24.04
+2026-07-22T04:34:17.0495512Z Version: 20260714.240.1
+2026-07-22T04:34:17.0496331Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260714.240/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-22T04:34:17.0497421Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260714.240
+2026-07-22T04:34:17.0498274Z ##[endgroup]
+2026-07-22T04:34:17.0499129Z ##[group]GITHUB_TOKEN Permissions
+2026-07-22T04:34:17.0500644Z Contents: read
+2026-07-22T04:34:17.0501053Z Metadata: read
+2026-07-22T04:34:17.0501428Z Packages: read
+2026-07-22T04:34:17.0501798Z ##[endgroup]
+2026-07-22T04:34:17.0503208Z Secret source: Actions
+2026-07-22T04:34:17.0504255Z Prepare workflow directory
+2026-07-22T04:34:17.0797089Z Prepare all required actions
+2026-07-22T04:34:17.0829627Z Getting action download info
+2026-07-22T04:34:17.3204925Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-07-22T04:34:17.9177598Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-07-22T04:34:18.1556208Z Complete job name: build
+2026-07-22T04:34:18.1945001Z ##[group]Checking docker version
+2026-07-22T04:34:18.1955252Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-07-22T04:34:18.2643269Z '1.48'
+2026-07-22T04:34:18.2656828Z Docker daemon API version: '1.48'
+2026-07-22T04:34:18.2657605Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-07-22T04:34:18.2800364Z '1.48'
+2026-07-22T04:34:18.2808815Z Docker client API version: '1.48'
+2026-07-22T04:34:18.2813359Z ##[endgroup]
+2026-07-22T04:34:18.2816259Z ##[group]Clean up resources from previous jobs
+2026-07-22T04:34:18.2821770Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=b10b73"
+2026-07-22T04:34:18.2940698Z ##[command]/usr/bin/docker network prune --force --filter "label=b10b73"
+2026-07-22T04:34:18.3046934Z ##[endgroup]
+2026-07-22T04:34:18.3047403Z ##[group]Create local container network
+2026-07-22T04:34:18.3056573Z ##[command]/usr/bin/docker network create --label b10b73 github_network_da78dad3d1ef48edaca34e961f64dde0
+2026-07-22T04:34:18.3496495Z f0888698ae077c871541dd0a03841de5d325d64b1a86cb2ed076147ac9efb3b5
+2026-07-22T04:34:18.3510202Z ##[endgroup]
+2026-07-22T04:34:18.3533169Z ##[group]Starting job container
+2026-07-22T04:34:18.3551066Z ##[command]/usr/bin/docker pull espressif/idf:release-v5.1
+2026-07-22T04:34:18.9565839Z release-v5.1: Pulling from espressif/idf
+2026-07-22T04:34:19.1432980Z 13b7e930469f: Pulling fs layer
+2026-07-22T04:34:19.1434206Z f970c1150904: Pulling fs layer
+2026-07-22T04:34:19.1435380Z 82cedd055fc6: Pulling fs layer
+2026-07-22T04:34:19.1436646Z 6ee677f41c28: Pulling fs layer
+2026-07-22T04:34:19.1437618Z a8ec0bdabe66: Pulling fs layer
+2026-07-22T04:34:19.1438673Z 18ba71b35b1b: Pulling fs layer
+2026-07-22T04:34:19.1439445Z 6ee677f41c28: Waiting
+2026-07-22T04:34:19.1440182Z a8ec0bdabe66: Waiting
+2026-07-22T04:34:19.1440933Z 18ba71b35b1b: Waiting
+2026-07-22T04:34:19.5026129Z 82cedd055fc6: Verifying Checksum
+2026-07-22T04:34:19.5028585Z 82cedd055fc6: Download complete
+2026-07-22T04:34:19.5251587Z 13b7e930469f: Verifying Checksum
+2026-07-22T04:34:19.5254003Z 13b7e930469f: Download complete
+2026-07-22T04:34:19.7673317Z f970c1150904: Download complete
+2026-07-22T04:34:19.9356938Z 18ba71b35b1b: Verifying Checksum
+2026-07-22T04:34:19.9370046Z 18ba71b35b1b: Download complete
+2026-07-22T04:34:20.8518432Z 13b7e930469f: Pull complete
+2026-07-22T04:34:22.2957599Z a8ec0bdabe66: Verifying Checksum
+2026-07-22T04:34:22.2958196Z a8ec0bdabe66: Download complete
+2026-07-22T04:34:31.4736060Z 6ee677f41c28: Verifying Checksum
+2026-07-22T04:34:31.4736482Z 6ee677f41c28: Download complete
+2026-07-22T04:34:46.3576059Z f970c1150904: Pull complete
+2026-07-22T04:34:48.6874035Z 82cedd055fc6: Pull complete
+2026-07-22T04:35:09.9445128Z 6ee677f41c28: Pull complete
+2026-07-22T04:35:31.2313229Z a8ec0bdabe66: Pull complete
+2026-07-22T04:35:31.2487537Z 18ba71b35b1b: Pull complete
+2026-07-22T04:35:31.2531762Z Digest: sha256:7e50d9df529a3c7b997df31c4c5e60830e7327ed7ef9be6f47def32ec66051d5
+2026-07-22T04:35:31.2546762Z Status: Downloaded newer image for espressif/idf:release-v5.1
+2026-07-22T04:35:31.2557369Z docker.io/espressif/idf:release-v5.1
+2026-07-22T04:35:31.2621271Z ##[command]/usr/bin/docker create --name 49e1341e9ec6440aa950e1d73e8d81d5_espressifidfreleasev51_d1747c --label b10b73 --workdir /__w/esp_pri/esp_pri --network github_network_da78dad3d1ef48edaca34e961f64dde0  -e "HOME=/github/home" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work":"/__w" -v "/home/runner/actions-runner/cached/2.336.0/externals":"/__e":ro -v "/home/runner/work/_temp":"/__w/_temp" -v "/home/runner/work/_actions":"/__w/_actions" -v "/opt/hostedtoolcache":"/__t" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" --entrypoint "tail" espressif/idf:release-v5.1 "-f" "/dev/null"
+2026-07-22T04:35:31.2856635Z 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:31.2871643Z ##[command]/usr/bin/docker start 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:31.5484333Z 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:31.5497792Z ##[command]/usr/bin/docker ps --all --filter id=772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-07-22T04:35:31.5603882Z 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5 Up Less than a second
+2026-07-22T04:35:31.5616495Z ##[command]/usr/bin/docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:31.5720578Z HOME=/github/home
+2026-07-22T04:35:31.5720983Z GITHUB_ACTIONS=true
+2026-07-22T04:35:31.5721281Z CI=true
+2026-07-22T04:35:31.5721618Z PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+2026-07-22T04:35:31.5721958Z IDF_PATH=/opt/esp/idf
+2026-07-22T04:35:31.5722190Z IDF_TOOLS_PATH=/opt/esp
+2026-07-22T04:35:31.5722513Z IDF_GITHUB_ASSETS=
+2026-07-22T04:35:31.5722778Z IDF_PYTHON_CHECK_CONSTRAINTS=no
+2026-07-22T04:35:31.5723061Z IDF_CCACHE_ENABLE=1
+2026-07-22T04:35:31.5734935Z ##[endgroup]
+2026-07-22T04:35:31.5742156Z ##[group]Waiting for all services to be ready
+2026-07-22T04:35:31.5743627Z ##[endgroup]
+2026-07-22T04:35:31.5955081Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-22T04:35:31.5960806Z ##[group]Run actions/checkout@v4
+2026-07-22T04:35:31.5961139Z with:
+2026-07-22T04:35:31.5961380Z   repository: qwzxcv12/esp_pri
+2026-07-22T04:35:31.5963321Z   token: ***
+2026-07-22T04:35:31.5963530Z   ssh-strict: true
+2026-07-22T04:35:31.5963760Z   ssh-user: git
+2026-07-22T04:35:31.5963977Z   persist-credentials: true
+2026-07-22T04:35:31.5964190Z   clean: true
+2026-07-22T04:35:31.5964521Z   sparse-checkout-cone-mode: true
+2026-07-22T04:35:31.5964792Z   fetch-depth: 1
+2026-07-22T04:35:31.5965181Z   fetch-tags: false
+2026-07-22T04:35:31.5965404Z   show-progress: true
+2026-07-22T04:35:31.5965613Z   lfs: false
+2026-07-22T04:35:31.5965942Z   submodules: false
+2026-07-22T04:35:31.5966151Z   set-safe-directory: true
+2026-07-22T04:35:31.5966395Z   allow-unsafe-pr-checkout: false
+2026-07-22T04:35:31.5966715Z ##[endgroup]
+2026-07-22T04:35:31.6013667Z ##[command]/usr/bin/docker exec  772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5 sh -c "cat /etc/*release | grep ^ID"
+2026-07-22T04:35:31.7541893Z Syncing repository: qwzxcv12/esp_pri
+2026-07-22T04:35:31.7543671Z ##[group]Getting Git version info
+2026-07-22T04:35:31.7544080Z Working directory is '/__w/esp_pri/esp_pri'
+2026-07-22T04:35:31.7544764Z [command]/usr/bin/git version
+2026-07-22T04:35:31.7545084Z git version 2.25.1
+2026-07-22T04:35:31.7546534Z ##[endgroup]
+2026-07-22T04:35:31.7558263Z Temporarily overriding HOME='/__w/_temp/f9f8494d-8a7b-4e23-b8cb-b9a29a46b117' before making global git config changes
+2026-07-22T04:35:31.7559153Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-22T04:35:31.7563593Z [command]/usr/bin/git config --global --add safe.directory /__w/esp_pri/esp_pri
+2026-07-22T04:35:31.7591015Z Deleting the contents of '/__w/esp_pri/esp_pri'
+2026-07-22T04:35:31.7595041Z ##[group]Initializing the repository
+2026-07-22T04:35:31.7598390Z [command]/usr/bin/git init /__w/esp_pri/esp_pri
+2026-07-22T04:35:31.7629615Z Initialized empty Git repository in /__w/esp_pri/esp_pri/.git/
+2026-07-22T04:35:31.7634606Z [command]/usr/bin/git remote add origin https://github.com/qwzxcv12/esp_pri
+2026-07-22T04:35:31.7660684Z ##[endgroup]
+2026-07-22T04:35:31.7662015Z ##[group]Disabling automatic garbage collection
+2026-07-22T04:35:31.7663182Z [command]/usr/bin/git config --local gc.auto 0
+2026-07-22T04:35:31.7689289Z ##[endgroup]
+2026-07-22T04:35:31.7689803Z ##[group]Setting up auth
+2026-07-22T04:35:31.7694539Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-22T04:35:31.7717941Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-22T04:35:31.7883258Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-22T04:35:31.7906829Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-22T04:35:31.8114774Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-22T04:35:31.8138083Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-22T04:35:31.8301447Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-22T04:35:31.8328008Z ##[endgroup]
+2026-07-22T04:35:31.8328490Z ##[group]Fetching the repository
+2026-07-22T04:35:31.8335677Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +94e8fadf22775a6aeac25fc3b2c4b16e3e9b423c:refs/remotes/origin/main
+2026-07-22T04:35:32.3130216Z From https://github.com/qwzxcv12/esp_pri
+2026-07-22T04:35:32.3131391Z  * [new ref]         94e8fadf22775a6aeac25fc3b2c4b16e3e9b423c -> origin/main
+2026-07-22T04:35:32.3148398Z ##[endgroup]
+2026-07-22T04:35:32.3148865Z ##[group]Determining the checkout info
+2026-07-22T04:35:32.3149367Z ##[endgroup]
+2026-07-22T04:35:32.3149768Z ##[group]Checking out the ref
+2026-07-22T04:35:32.3151060Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-07-22T04:35:32.3229368Z Switched to a new branch 'main'
+2026-07-22T04:35:32.3229924Z Branch 'main' set up to track remote branch 'main' from 'origin'.
+2026-07-22T04:35:32.3231348Z ##[endgroup]
+2026-07-22T04:35:32.3255223Z [command]/usr/bin/git log -1 --format=%H
+2026-07-22T04:35:32.3272605Z 94e8fadf22775a6aeac25fc3b2c4b16e3e9b423c
+2026-07-22T04:35:32.3443037Z ##[group]Run mkdir -p project/main
+2026-07-22T04:35:32.3443374Z [36;1mmkdir -p project/main[0m
+2026-07-22T04:35:32.3443686Z [36;1mmkdir -p project/components[0m
+2026-07-22T04:35:32.3443968Z [36;1m[0m
+2026-07-22T04:35:32.3444204Z [36;1mcp pri_NOW.cpp project/main/main.cpp[0m
+2026-07-22T04:35:32.3444492Z [36;1mcp *.h project/main/ || true[0m
+2026-07-22T04:35:32.3444761Z [36;1mcp idf_component.yml project/main/[0m
+2026-07-22T04:35:32.3445105Z [36;1mcp CMakeLists_main.txt project/main/CMakeLists.txt[0m
+2026-07-22T04:35:32.3445429Z [36;1mcp sdkconfig.defaults project/[0m
+2026-07-22T04:35:32.3445684Z [36;1mcp partitions.csv project/ || true[0m
+2026-07-22T04:35:32.3445965Z [36;1m[0m
+2026-07-22T04:35:32.3446552Z [36;1mprintf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude(\{IDF_PATH}/tools/cmake/project.cmake)\nproject(pri_NOW)\n' > project/CMakeLists.txt[0m
+2026-07-22T04:35:32.3447314Z [36;1m[0m
+2026-07-22T04:35:32.3447715Z [36;1mgit clone --depth 1 -b release/v3.0.x https://github.com/espressif/arduino-esp32.git project/components/arduino[0m
+2026-07-22T04:35:32.3450986Z shell: sh -e {0}
+2026-07-22T04:35:32.3451209Z ##[endgroup]
+2026-07-22T04:35:32.3980518Z Cloning into 'project/components/arduino'...
+2026-07-22T04:35:34.4955927Z ##[group]Run . $IDF_PATH/export.sh
+2026-07-22T04:35:34.4956247Z [36;1m. $IDF_PATH/export.sh[0m
+2026-07-22T04:35:34.4956476Z [36;1mcd project[0m
+2026-07-22T04:35:34.4956811Z [36;1midf.py set-target esp32s3[0m
+2026-07-22T04:35:34.4957057Z [36;1midf.py build[0m
+2026-07-22T04:35:34.4959459Z shell: bash --noprofile --norc -e -o pipefail {0}
+2026-07-22T04:35:34.4959760Z ##[endgroup]
+2026-07-22T04:35:34.5430321Z Detecting the Python interpreter
+2026-07-22T04:35:34.5440299Z Checking "python3" ...
+2026-07-22T04:35:34.5599872Z Python 3.8.10
+2026-07-22T04:35:34.5600285Z "python3" has been detected
+2026-07-22T04:35:34.5600598Z Checking Python compatibility
+2026-07-22T04:35:34.5725224Z Checking other ESP-IDF version.
+2026-07-22T04:35:34.7017292Z Adding ESP-IDF tools to PATH...
+2026-07-22T04:35:34.8755419Z Checking if Python packages are up to date...
+2026-07-22T04:35:35.0726584Z Python requirements are satisfied.
+2026-07-22T04:35:35.0822949Z Requirement files:
+2026-07-22T04:35:35.0823736Z  - /opt/esp/idf/tools/requirements/requirements.core.txt
+2026-07-22T04:35:35.0824168Z Python being checked: /opt/esp/python_env/idf5.1_py3.8_env/bin/python
+2026-07-22T04:35:35.0911972Z Added the following directories to PATH:
+2026-07-22T04:35:35.0912515Z   /opt/esp/idf/components/espcoredump
+2026-07-22T04:35:35.0912891Z   /opt/esp/idf/components/partition_table
+2026-07-22T04:35:35.0913978Z   /opt/esp/idf/components/app_update
+2026-07-22T04:35:35.0914934Z   /opt/esp/tools/xtensa-esp-elf-gdb/12.1_20231023/xtensa-esp-elf-gdb/bin
+2026-07-22T04:35:35.0915665Z   /opt/esp/tools/riscv32-esp-elf-gdb/12.1_20231023/riscv32-esp-elf-gdb/bin
+2026-07-22T04:35:35.0916344Z   /opt/esp/tools/xtensa-esp32-elf/esp-12.2.0_20250801/xtensa-esp32-elf/bin
+2026-07-22T04:35:35.0916898Z   /opt/esp/tools/xtensa-esp32s2-elf/esp-12.2.0_20250801/xtensa-esp32s2-elf/bin
+2026-07-22T04:35:35.0917437Z   /opt/esp/tools/xtensa-esp32s3-elf/esp-12.2.0_20250801/xtensa-esp32s3-elf/bin
+2026-07-22T04:35:35.0918105Z   /opt/esp/tools/riscv32-esp-elf/esp-12.2.0_20250801/riscv32-esp-elf/bin
+2026-07-22T04:35:35.0918681Z   /opt/esp/tools/esp32ulp-elf/2.35_20220830/esp32ulp-elf/bin
+2026-07-22T04:35:35.0919064Z   /opt/esp/tools/cmake/3.30.2/bin
+2026-07-22T04:35:35.0919441Z   /opt/esp/tools/openocd-esp32/v0.12.0-esp32-20250707/openocd-esp32/bin
+2026-07-22T04:35:35.0919921Z   /opt/esp/tools/qemu-xtensa/esp_develop_8.1.3_20231206/qemu/bin
+2026-07-22T04:35:35.0920339Z   /opt/esp/tools/qemu-riscv32/esp_develop_8.1.3_20231206/qemu/bin
+2026-07-22T04:35:35.0920868Z   /opt/esp/tools/xtensa-esp-elf-gdb/12.1_20231023/xtensa-esp-elf-gdb/bin
+2026-07-22T04:35:35.0921775Z   /opt/esp/tools/riscv32-esp-elf-gdb/12.1_20231023/riscv32-esp-elf-gdb/bin
+2026-07-22T04:35:35.0922264Z   /opt/esp/tools/xtensa-esp32-elf/esp-12.2.0_20250801/xtensa-esp32-elf/bin
+2026-07-22T04:35:35.0922987Z   /opt/esp/tools/xtensa-esp32s2-elf/esp-12.2.0_20250801/xtensa-esp32s2-elf/bin
+2026-07-22T04:35:35.0923546Z   /opt/esp/tools/xtensa-esp32s3-elf/esp-12.2.0_20250801/xtensa-esp32s3-elf/bin
+2026-07-22T04:35:35.0924118Z   /opt/esp/tools/riscv32-esp-elf/esp-12.2.0_20250801/riscv32-esp-elf/bin
+2026-07-22T04:35:35.0924614Z   /opt/esp/tools/esp32ulp-elf/2.35_20220830/esp32ulp-elf/bin
+2026-07-22T04:35:35.0925019Z   /opt/esp/tools/cmake/3.30.2/bin
+2026-07-22T04:35:35.0925443Z   /opt/esp/tools/openocd-esp32/v0.12.0-esp32-20250707/openocd-esp32/bin
+2026-07-22T04:35:35.0925948Z   /opt/esp/tools/qemu-xtensa/esp_develop_8.1.3_20231206/qemu/bin
+2026-07-22T04:35:35.0926398Z   /opt/esp/tools/qemu-riscv32/esp_develop_8.1.3_20231206/qemu/bin
+2026-07-22T04:35:35.0926824Z   /opt/esp/python_env/idf5.1_py3.8_env/bin
+2026-07-22T04:35:35.0927164Z   /opt/esp/idf/tools
+2026-07-22T04:35:35.2395805Z Done! You can now compile ESP-IDF projects.
+2026-07-22T04:35:35.2396487Z Go to the project directory and run:
+2026-07-22T04:35:35.2396697Z 
+2026-07-22T04:35:35.2396820Z   idf.py build
+2026-07-22T04:35:35.2396962Z 
+2026-07-22T04:35:36.2597162Z CMake Error at CMakeLists.txt:3 (include):
+2026-07-22T04:35:36.2599021Z Adding "set-target"'s dependency "fullclean" to list of commands with default set of options.
+2026-07-22T04:35:36.2599599Z Executing action: fullclean
+2026-07-22T04:35:36.2600122Z Build directory '/__w/esp_pri/esp_pri/project/build' not found. Nothing to clean.
+2026-07-22T04:35:36.2600601Z Executing action: set-target
+2026-07-22T04:35:36.2600959Z Set Target to: esp32s3, new sdkconfig will be created.
+2026-07-22T04:35:36.2601455Z Running cmake in directory /__w/esp_pri/esp_pri/project/build
+2026-07-22T04:35:36.2602404Z Executing "cmake -G Ninja -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/opt/esp/python_env/idf5.1_py3.8_env/bin/python -DESP_PLATFORM=1 -DIDF_TARGET=esp32s3 -DCCACHE_ENABLE=1 /__w/esp_pri/esp_pri/project"...
+2026-07-22T04:35:36.2603349Z -- The C compiler identification is GNU 9.4.0
+2026-07-22T04:35:36.2603768Z   include could not find requested file:
+2026-07-22T04:35:36.2604309Z 
+2026-07-22T04:35:36.2605100Z     {IDF_PATH}/tools/cmake/project.cmake
+2026-07-22T04:35:36.2605376Z 
+2026-07-22T04:35:36.2605380Z 
+2026-07-22T04:35:36.2871070Z -- The CXX compiler identification is GNU 9.4.0
+2026-07-22T04:35:36.2957481Z -- Detecting C compiler ABI info
+2026-07-22T04:35:36.3888242Z -- Detecting C compiler ABI info - done
+2026-07-22T04:35:36.3989598Z -- Check for working C compiler: /usr/bin/cc - skipped
+2026-07-22T04:35:36.4000907Z -- Detecting C compile features
+2026-07-22T04:35:36.4001365Z -- Detecting C compile features - done
+2026-07-22T04:35:36.4039924Z -- Detecting CXX compiler ABI info
+2026-07-22T04:35:36.4629051Z -- Detecting CXX compiler ABI info - done
+2026-07-22T04:35:36.4731834Z -- Check for working CXX compiler: /usr/bin/c++ - skipped
+2026-07-22T04:35:36.4732910Z -- Detecting CXX compile features
+2026-07-22T04:35:36.4738061Z -- Detecting CXX compile features - done
+2026-07-22T04:35:36.4744107Z -- Configuring incomplete, errors occurred!
+2026-07-22T04:35:36.5050726Z cmake failed with exit code 1, output of the command is in the /__w/esp_pri/esp_pri/project/build/log/idf_py_stderr_output_330 and /__w/esp_pri/esp_pri/project/build/log/idf_py_stdout_output_330
+2026-07-22T04:35:36.5692453Z ##[error]Process completed with exit code 2.
+2026-07-22T04:35:36.5808606Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-22T04:35:36.5809793Z Post job cleanup.
+2026-07-22T04:35:36.5817427Z ##[command]/usr/bin/docker exec  772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5 sh -c "cat /etc/*release | grep ^ID"
+2026-07-22T04:35:36.7175170Z [command]/usr/bin/git version
+2026-07-22T04:35:36.7201745Z git version 2.25.1
+2026-07-22T04:35:36.7232787Z Temporarily overriding HOME='/__w/_temp/772826d7-b601-4c7e-bf3a-3ec2b1b05ac2' before making global git config changes
+2026-07-22T04:35:36.7233618Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-22T04:35:36.7234555Z [command]/usr/bin/git config --global --add safe.directory /__w/esp_pri/esp_pri
+2026-07-22T04:35:36.7263738Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-22T04:35:36.7290548Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-22T04:35:36.7455532Z fatal: No url found for submodule path 'pri-ESP' in .gitmodules
+2026-07-22T04:35:36.7491825Z ##[warning]The process '/usr/bin/git' failed with exit code 128
+2026-07-22T04:35:36.7613266Z Stop and remove container: 49e1341e9ec6440aa950e1d73e8d81d5_espressifidfreleasev51_d1747c
+2026-07-22T04:35:36.7621363Z ##[command]/usr/bin/docker rm --force 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:37.4724045Z 772b89b68669f140a32d5f5a8360e8d28f1920d88458e08e4f7fd80f0e9f65c5
+2026-07-22T04:35:37.4746417Z Remove container network: github_network_da78dad3d1ef48edaca34e961f64dde0
+2026-07-22T04:35:37.4749727Z ##[command]/usr/bin/docker network rm github_network_da78dad3d1ef48edaca34e961f64dde0
+2026-07-22T04:35:37.5788195Z github_network_da78dad3d1ef48edaca34e961f64dde0
+2026-07-22T04:35:37.5854392Z Cleaning up orphan processes
+2026-07-22T04:35:37.6074050Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
