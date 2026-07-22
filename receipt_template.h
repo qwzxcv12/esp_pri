@@ -152,4 +152,58 @@ inline void print_qms_ticket(ThermalPrinter &printer, const char* unitName, cons
     printer.cut();
 }
 
+inline void print_startup_test_ticket(const char* ip_str, const char* wifi_ssid, const char* mqtt_host, bool mqtt_connected) {
+    ThermalPrinter &printer = g_printer;
+    printer.resetSettings();
+    printer.useHeaderStyle();
+    printer.println("THIET BI KHOI DONG");
+    
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(30);
+    printer.println("------------------------------------------");
+    
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::LEFT);
+    printer.setSize(1);
+    
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Device ID: %s", (g_dev_id && strlen(g_dev_id) > 0) ? g_dev_id : "N/A");
+    printer.println(buf);
+    
+    snprintf(buf, sizeof(buf), "WiFi SSID: %s", (wifi_ssid && strlen(wifi_ssid) > 0) ? wifi_ssid : "AP Mode");
+    printer.println(buf);
+    
+    snprintf(buf, sizeof(buf), "IP Addr  : %s", (ip_str && strlen(ip_str) > 0) ? ip_str : "N/A");
+    printer.println(buf);
+    
+    snprintf(buf, sizeof(buf), "MQTT Host: %s", (mqtt_host && strlen(mqtt_host) > 0) ? mqtt_host : "N/A");
+    printer.println(buf);
+    
+    snprintf(buf, sizeof(buf), "MQTT Stat: %s", mqtt_connected ? "CONNECTED" : "READY");
+    printer.println(buf);
+    
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(30);
+    printer.println("------------------------------------------");
+    
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    setenv("TZ", "CST-7", 1);
+    tzset();
+    localtime_r(&now, &timeinfo);
+    char timeStr[64];
+    strftime(timeStr, sizeof(timeStr), "K.Dong: %d/%m/%Y %H:%M:%S", &timeinfo);
+    printer.println(timeStr);
+    printer.println("DA SAN SANG KET NOI & HOAT DONG");
+    
+    printer.println("\n\n\n\n\n");
+    printer.cut();
+}
+
 #endif
