@@ -217,15 +217,28 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 }
                             }
                         } else if (strcmp(cmd->valuestring, "print_ticket") == 0) {
-                            cJSON *data = cJSON_GetObjectItem(root, "data");
-                            if (data) {
-                                const char *ticket = cJSON_GetStringValue(cJSON_GetObjectItem(data, "ticket"));
-                                const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
-                                const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
-                                
-                                add_device_log(">>> PRINTING TICKET: %s (Service: %s)", ticket ? ticket : "N/A", service ? service : "N/A");
-                                print_qms_ticket(g_printer, g_unit_name, service, ticket, cust_name);
-                            }
+                            cJSON *target = cJSON_GetObjectItem(root, "data");
+                            if (!target) target = root;
+
+                            cJSON *t_num = cJSON_GetObjectItem(target, "ticket_number");
+                            if (!t_num) t_num = cJSON_GetObjectItem(target, "ticket");
+
+                            cJSON *s_name = cJSON_GetObjectItem(target, "service_name");
+                            if (!s_name) s_name = cJSON_GetObjectItem(target, "service");
+
+                            cJSON *u_name = cJSON_GetObjectItem(target, "unit_name");
+                            const char *unit = (u_name && u_name->valuestring) ? u_name->valuestring : g_unit_name;
+
+                            cJSON *t_time = cJSON_GetObjectItem(target, "time");
+                            cJSON *t_date = cJSON_GetObjectItem(target, "date");
+
+                            const char *ticket = (t_num && t_num->valuestring) ? t_num->valuestring : "000";
+                            const char *service = (s_name && s_name->valuestring) ? s_name->valuestring : "DICH VU";
+                            const char *time_val = (t_time && t_time->valuestring) ? t_time->valuestring : nullptr;
+                            const char *date_val = (t_date && t_date->valuestring) ? t_date->valuestring : nullptr;
+
+                            add_device_log(">>> IN PHIẾU TỪ SERVER: Số %s - %s (%s %s)", ticket, service, date_val ? date_val : "", time_val ? time_val : "");
+                            print_qms_ticket(g_printer, unit, service, ticket, time_val, date_val);
                             processed = true;
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                             add_device_log(">>> COMMAND: Clear screen");

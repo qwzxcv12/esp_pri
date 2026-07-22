@@ -1212,7 +1212,10 @@ static void button_task(void *pvParameters) {
                 // Button pressed (falling edge)
                 add_device_log("Nút bấm GPIO %d được nhấn (Service ID: %d)", g_pin_mappings[i].pin, g_pin_mappings[i].service_id);
                 send_ticket_request_by_service_id(g_pin_mappings[i].service_id);
-                print_ticket_by_service_id(g_pin_mappings[i].service_id, "Nút Bấm Trực Tiếp");
+                if (!mqtt_client) {
+                    // Offline fallback: print locally if MQTT is not connected
+                    print_ticket_by_service_id(g_pin_mappings[i].service_id);
+                }
                 vTaskDelay(pdMS_TO_TICKS(500)); // Debounce and block hold
             }
             last_state[i] = current_state;
