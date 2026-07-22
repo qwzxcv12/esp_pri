@@ -156,8 +156,15 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     }
 
     case MQTT_EVENT_DISCONNECTED:
-        add_device_log("MQTT DISCONNECTED. Reconnecting...");
+        add_device_log("MQTT DISCONNECTED from broker (%s). Reconnecting in background...", g_mqtt_server_host);
+        break;
 
+    case MQTT_EVENT_ERROR:
+        if (event->error_handle && event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+            add_device_log("MQTT ERROR: TCP Transport failed (errno=%d). Check broker IP/port/network.", event->error_handle->esp_transport_sock_errno);
+        } else {
+            add_device_log("MQTT ERROR: Connection failed (error_type=0x%x).", event->error_handle ? event->error_handle->error_type : 0);
+        }
         break;
 
     case MQTT_EVENT_SUBSCRIBED:

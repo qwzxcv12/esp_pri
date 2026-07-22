@@ -248,6 +248,18 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         if (s_wifi_event_group != NULL) {
             xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         }
+
+        // Auto-start MQTT client when IP is obtained if configured and not yet running
+        if (mqtt_client == NULL) {
+            char mqtt_server[64] = {0}, mqtt_port[16] = {0}, mqtt_user[64] = {0}, mqtt_pass[64] = {0}, mqtt_topic[256] = {0};
+            read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port), mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass), mqtt_topic, sizeof(mqtt_topic));
+            if (strlen(mqtt_server) > 0) {
+                int port = 1883;
+                if (strlen(mqtt_port) > 0) port = atoi(mqtt_port);
+                add_device_log("Network ready. Starting MQTT connection to %s:%d...", mqtt_server, port);
+                mqtt_app_start(mqtt_server, port, mqtt_user, mqtt_pass, mqtt_topic);
+            }
+        }
     }
 }
 
@@ -646,9 +658,22 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         parse_url_param(buf, "mqtt_port", mqtt_port, sizeof(mqtt_port));
         parse_url_param(buf, "mqtt_user", mqtt_user, sizeof(mqtt_user));
         parse_url_param(buf, "mqtt_pass", mqtt_pass, sizeof(mqtt_pass));
-        parse_url_param(buf, "mqtt_topic", mqtt_topic, sizeof(mqtt_topic));
         err = save_mqtt_config(mqtt_server, mqtt_port, mqtt_user, mqtt_pass, mqtt_topic);
-        add_device_log("MQTT configuration saved.");
+        add_device_log("MQTT configuration saved. Re-initializing MQTT connection...");
+
+        // Stop existing MQTT client if running
+        if (mqtt_client != NULL) {
+            esp_mqtt_client_stop(mqtt_client);
+            esp_mqtt_client_destroy(mqtt_client);
+            mqtt_client = NULL;
+        }
+
+        // Start new MQTT connection immediately
+        if (strlen(mqtt_server) > 0) {
+            int port = 1883;
+            if (strlen(mqtt_port) > 0) port = atoi(mqtt_port);
+            mqtt_app_start(mqtt_server, port, mqtt_user, mqtt_pass, mqtt_topic);
+        }
     }
     else if (strcmp(config_section, "WS") == 0) {
         char ws_url[128] = {0};
