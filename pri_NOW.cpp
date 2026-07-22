@@ -993,11 +993,17 @@ static esp_err_t api_scan_wifi_get_handler(httpd_req_t *req)
     scan_config.show_hidden = false;
     scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
 
-    esp_wifi_scan_start(&scan_config, true);
+    esp_err_t scan_err = esp_wifi_scan_start(&scan_config, true);
+    if (scan_err != ESP_OK) {
+        add_device_log("WiFi Scan failed: 0x%x (%s)", scan_err, esp_err_to_name(scan_err));
+        httpd_resp_sendstr(req, "[]");
+        return ESP_OK;
+    }
 
     uint16_t number = 16;
     wifi_ap_record_t ap_records[16];
     esp_wifi_scan_get_ap_records(&number, ap_records);
+    add_device_log("WiFi Scan complete. Found %d networks.", number);
 
     cJSON *root = cJSON_CreateArray();
     for (int i = 0; i < number; i++) {
@@ -1473,7 +1479,7 @@ extern "C" void app_main(void)
         wifi_config.ap.max_connection = 4;
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
 
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
 
