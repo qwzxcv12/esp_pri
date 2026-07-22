@@ -305,8 +305,33 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 add_device_log("Vui lòng truy cập trang Web (Tab Firmware Update) để xác nhận cài đặt!");
                             }
                             processed = true;
+                        } else if (strcmp(cmd->valuestring, "error") == 0) {
+                            cJSON *msg_json = cJSON_GetObjectItem(root, "message");
+                            cJSON *code_json = cJSON_GetObjectItem(root, "error_code");
+                            cJSON *u_name = cJSON_GetObjectItem(root, "unit_name");
+                            const char *unit = (u_name && u_name->valuestring) ? u_name->valuestring : g_unit_name;
+                            const char *msg_str = (msg_json && msg_json->valuestring) ? msg_json->valuestring : "Dich vu da het so hom nay.";
+                            const char *code_str = (code_json && code_json->valuestring) ? code_json->valuestring : "ERROR";
+
+                            add_device_log(">>> LOI TU SERVER: [%s] %s -> IN PHIEU THONG BAO", code_str, msg_str);
+                            print_error_notice_ticket(g_printer, unit, msg_str);
+                            processed = true;
                         }
                     }
+
+                    cJSON *err_code_json = cJSON_GetObjectItem(root, "error_code");
+                    if (!processed && err_code_json && err_code_json->valuestring) {
+                        cJSON *msg_json = cJSON_GetObjectItem(root, "message");
+                        cJSON *u_name = cJSON_GetObjectItem(root, "unit_name");
+                        const char *unit = (u_name && u_name->valuestring) ? u_name->valuestring : g_unit_name;
+                        const char *msg_str = (msg_json && msg_json->valuestring) ? msg_json->valuestring : "Dich vu da het so hom nay.";
+                        const char *code_str = err_code_json->valuestring;
+
+                        add_device_log(">>> LOI TU SERVER: [%s] %s -> IN PHIEU THONG BAO", code_str, msg_str);
+                        print_error_notice_ticket(g_printer, unit, msg_str);
+                        processed = true;
+                    }
+
                     cJSON_Delete(root);
                 } else {
                     add_device_log("Warning: Failed to parse JSON");

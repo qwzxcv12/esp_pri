@@ -184,6 +184,66 @@ inline void print_qms_ticket(ThermalPrinter &printer,
     printer.cut();
 }
 
+inline void print_error_notice_ticket(ThermalPrinter &printer, const char* unitName, const char* errorMessage) {
+    std::string cleanUnit = remove_vietnamese_accents(unitName && strlen(unitName) > 0 ? unitName : "HE THONG XEP HANG");
+    std::string cleanMsg  = remove_vietnamese_accents(errorMessage && strlen(errorMessage) > 0 ? errorMessage : "Dich vu da het so hom nay.");
+
+    // Standardize "Dich vu da het so hom nay (Toi da: X.)" -> "Dich vu da het so hom nay (Toi da: X phieu)"
+    size_t pos = cleanMsg.find(".)");
+    if (pos != std::string::npos) {
+        cleanMsg.replace(pos, 2, " phieu)");
+    } else {
+        size_t pos2 = cleanMsg.find(")");
+        if (pos2 != std::string::npos && cleanMsg.find("Toi da") != std::string::npos && cleanMsg.find("phieu") == std::string::npos) {
+            cleanMsg.replace(pos2, 1, " phieu)");
+        }
+    }
+
+    printer.resetSettings();
+    printer.useHeaderStyle();
+    printer.setLineSpacing(50);
+    printer.println(cleanUnit.c_str());
+
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(35);
+    printer.println("------------------------------------------");
+
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setSize(2);
+    printer.setBold(true);
+    printer.setLineSpacing(50);
+    printer.println("THONG BAO");
+
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(35);
+    printer.println("------------------------------------------");
+
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setSize(2);
+    printer.setBold(true);
+    printer.setLineSpacing(55);
+    printer.println(cleanMsg.c_str());
+
+    printer.resetSettings();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setLineSpacing(35);
+    printer.println("------------------------------------------");
+
+    printer.useBodyStyle();
+    printer.setAlignment(ThermalPrinter::CENTER);
+    printer.setSize(1);
+    printer.setBold(false);
+    printer.setLineSpacing(45);
+    printer.println("Xin vui long quay lai sau! Xin cam on.");
+
+    printer.println("\n\n");
+    printer.cut();
+}
+
 inline void print_startup_test_ticket(ThermalPrinter &printer, const char* dev_id, const char* ip_str, const char* wifi_ssid, const char* mqtt_host, bool mqtt_connected) {
     (void)mqtt_host;
 
