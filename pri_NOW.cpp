@@ -37,9 +37,9 @@ void init_thermal_printer() {
     uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
     uart_config.source_clk = UART_SCLK_DEFAULT;
     uart_param_config(UART_NUM_2, &uart_config);
-    uart_set_pin(UART_NUM_2, GPIO_NUM_17, GPIO_NUM_18, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(UART_NUM_2, GPIO_NUM_18, GPIO_NUM_17, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_driver_install(UART_NUM_2, 1024, 2048, 0, NULL, 0);
-    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18 (Baud: 9600, TX Buf: 2048)");
+    ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=18, RX=17 (Baud: 9600, TX Buf: 2048)");
 }
 #include <mutex>
 
