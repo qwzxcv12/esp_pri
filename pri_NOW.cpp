@@ -235,9 +235,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             }
         } else {
-            // Runtime phase: infinite retries
-            add_device_log("WiFi lost during runtime. Retrying in 5s...");
-            vTaskDelay(pdMS_TO_TICKS(5000));
+            // Runtime phase: reconnect directly without blocking event loop
+            add_device_log("WiFi lost during runtime. Retrying connection...");
             esp_wifi_connect();
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -246,7 +245,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
         add_device_log("Successfully got IP: %s", ip_str);
         s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        if (s_wifi_event_group != NULL) {
+            xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        }
     }
 }
 
