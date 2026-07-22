@@ -341,12 +341,21 @@ inline void mqtt_app_start(const char* broker, int port, const char* user, const
     }
     mqtt_cfg.network.reconnect_timeout_ms = 5000;
 
+    if (mqtt_client) {
+        esp_mqtt_client_stop(mqtt_client);
+        esp_mqtt_client_destroy(mqtt_client);
+        mqtt_client = NULL;
+    }
+
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(mqtt_client);
 
+    static TaskHandle_t s_hb_task = NULL;
     if (strlen(g_dev_id) > 0 && strlen(g_dev_key) > 0) {
-        xTaskCreate(mqtt_heartbeat_task, "mqtt_hb", 4096, NULL, 5, NULL);
+        if (!s_hb_task) {
+            xTaskCreate(mqtt_heartbeat_task, "mqtt_hb", 4096, NULL, 5, &s_hb_task);
+        }
     } else {
         add_device_log("Warning: Device credentials not set, Heartbeat disabled.");
     }
