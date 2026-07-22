@@ -152,12 +152,35 @@ esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t p
 // ==================== TICKET TEMPLATE NVS ====================
 esp_err_t save_ticket_template(const char* json_str) {
     if (!json_str || strlen(json_str) == 0) return ESP_ERR_INVALID_ARG;
+
+    // Compact (minify) the JSON to reduce NVS size
+    cJSON *parsed = cJSON_Parse(json_str);
+    if (!parsed) return ESP_ERR_INVALID_ARG;
+    char* compact = cJSON_PrintUnformatted(parsed);
+    cJSON_Delete(parsed);
+    if (!compact) return ESP_ERR_NO_MEM;
+
+    size_t compact_len = strlen(compact);
+    ESP_LOGI("NVS_TPL", "Saving ticket template: %u bytes (compact)", (unsigned)compact_len);
+
     nvs_handle_t h;
     esp_err_t err = nvs_open("ticket_tpl", NVS_READWRITE, &h);
-    if (err != ESP_OK) return err;
-    err = nvs_set_str(h, "tpl_json", json_str);
-    if (err == ESP_OK) nvs_commit(h);
+    if (err != ESP_OK) {
+        ESP_LOGE("NVS_TPL", "nvs_open failed: %s", esp_err_to_name(err));
+        free(compact);
+        return err;
+    }
+    // Erase old entry first to avoid NVS fragmentation
+    nvs_erase_key(h, "tpl_json"); // ignore error if key doesn't exist
+    err = nvs_set_str(h, "tpl_json", compact);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+        if (err != ESP_OK) ESP_LOGE("NVS_TPL", "nvs_commit failed: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGE("NVS_TPL", "nvs_set_str failed: %s (len=%u)", esp_err_to_name(err), (unsigned)compact_len);
+    }
     nvs_close(h);
+    free(compact);
     return err;
 }
 
@@ -920,11 +943,11 @@ static esp_err_t api_ticket_template_post_handler(httpd_req_t *req)
 {
     if (!is_authorized(req)) { httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized"); return ESP_OK; }
     int total = req->content_len;
-    if (total <= 0 || total > 4000) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large or empty (max 4000 bytes)");
+    if (total <= 0 || total > 8000) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large or empty (max 8000 bytes)");
         return ESP_FAIL;
     }
-    char* body = (char*)malloc(total + 1);
+    char* body = (char*)malloc(total + 2);
     if (!body) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory"); return ESP_FAIL; }
     int received = 0, ret;
     while (received < total) {
@@ -945,10 +968,13 @@ static esp_err_t api_ticket_template_post_handler(httpd_req_t *req)
     free(body);
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     if (err == ESP_OK) {
-        add_device_log("Ticket template saved to NVS (%d bytes)", received);
+        add_device_log("Ticket template saved to NVS (%d bytes input)", received);
         httpd_resp_sendstr(req, "OK - Template saved");
     } else {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed");
+        char errmsg[64];
+        snprintf(errmsg, sizeof(errmsg), "NVS write failed: %s", esp_err_to_name(err));
+        add_device_log("ERROR saving ticket template: %s", errmsg);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, errmsg);
     }
     return ESP_OK;
 }
