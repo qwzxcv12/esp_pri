@@ -42,6 +42,7 @@ void init_thermal_printer() {
     ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18");
 }
 static const char *TAG = "wifi_manager";
+static bool g_in_ap_mode = false;
 
 
 
@@ -1020,8 +1021,6 @@ static esp_err_t api_gpio_config_post_handler(httpd_req_t *req)
     }
     return ESP_OK;
 }
-
-static bool g_in_ap_mode = false;
 
 static int wifi_rssi_to_quality(int rssi) {
     if (rssi <= -100) return 0;
