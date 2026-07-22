@@ -240,8 +240,25 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                             const char *time_val = (t_time && t_time->valuestring) ? t_time->valuestring : nullptr;
                             const char *date_val = (t_date && t_date->valuestring) ? t_date->valuestring : nullptr;
 
-                            add_device_log(">>> IN PHIẾU TỪ SERVER: Số %s (Đang gọi: %s, %s %s)", ticket, calling, date_val ? date_val : "", time_val ? time_val : "");
-                            print_qms_ticket(g_printer, unit, service, ticket, calling, time_val, date_val);
+                            add_device_log(">>> IN PHIEU TU SERVER: So %s (Dang goi: %s, %s %s)", ticket, calling, date_val ? date_val : "", time_val ? time_val : "");
+                            // Smart print: use JSON template from NVS if available
+                            {
+                                static char tpl_buf[4096];
+                                extern esp_err_t read_ticket_template(char*, size_t);
+                                esp_err_t tpl_err = read_ticket_template(tpl_buf, sizeof(tpl_buf));
+                                if (tpl_err == ESP_OK && strlen(tpl_buf) > 0) {
+                                    cJSON *jtpl = cJSON_Parse(tpl_buf);
+                                    if (jtpl) {
+                                        cJSON *rows = cJSON_GetObjectItem(jtpl, "rows");
+                                        print_qms_ticket_from_json(g_printer, rows, unit, service, ticket, calling, time_val, date_val);
+                                        cJSON_Delete(jtpl);
+                                    } else {
+                                        print_qms_ticket(g_printer, unit, service, ticket, calling, time_val, date_val);
+                                    }
+                                } else {
+                                    print_qms_ticket(g_printer, unit, service, ticket, calling, time_val, date_val);
+                                }
+                            }
                             processed = true;
                         } else if (strcmp(cmd->valuestring, "clear_display") == 0) {
                             add_device_log(">>> COMMAND: Clear screen");

@@ -17,6 +17,8 @@
 #include "wifi_config_html.h"
 #include "Arduino.h"
 #include "mqtt_handler.h"
+#include "receipt_template.h"
+#include "page_ticket_config.h"
 #include "driver/gpio.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
@@ -145,6 +147,29 @@ esp_err_t read_mqtt_config(char* server, size_t server_len, char* port, size_t p
     if (nvs_get_str(my_handle, "topic", topic, &topic_len) != ESP_OK) topic[0] = '\0';
     nvs_close(my_handle);
     return ESP_OK;
+}
+
+// ==================== TICKET TEMPLATE NVS ====================
+esp_err_t save_ticket_template(const char* json_str) {
+    if (!json_str || strlen(json_str) == 0) return ESP_ERR_INVALID_ARG;
+    nvs_handle_t h;
+    esp_err_t err = nvs_open("ticket_tpl", NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+    err = nvs_set_str(h, "tpl_json", json_str);
+    if (err == ESP_OK) nvs_commit(h);
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t read_ticket_template(char* out, size_t len) {
+    if (!out || len == 0) return ESP_ERR_INVALID_ARG;
+    out[0] = '\0';
+    nvs_handle_t h;
+    esp_err_t err = nvs_open("ticket_tpl", NVS_READONLY, &h);
+    if (err != ESP_OK) return err;
+    err = nvs_get_str(h, "tpl_json", out, &len);
+    nvs_close(h);
+    return err;
 }
 
 esp_err_t save_ws_config(const char* url) {
@@ -851,10 +876,106 @@ static esp_err_t api_test_print_get_handler(httpd_req_t *req)
         return ESP_OK;
     }
     add_device_log(">>> TEST PRINT INITIATED FROM WEB API <<<");
-    print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "---");
+    // Smart print: use JSON template from NVS if available
+    {
+        static char tpl_buf[4096];
+        esp_err_t tpl_err = read_ticket_template(tpl_buf, sizeof(tpl_buf));
+        if (tpl_err == ESP_OK && strlen(tpl_buf) > 0) {
+            cJSON *jtpl = cJSON_Parse(tpl_buf);
+            if (jtpl) {
+                cJSON *rows = cJSON_GetObjectItem(jtpl, "rows");
+                print_qms_ticket_from_json(g_printer, rows, g_unit_name, "DICH VU TEST", "A001", "---", "13:00:00", "01/01/2026");
+                cJSON_Delete(jtpl);
+            } else {
+                print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "---");
+            }
+        } else {
+            print_qms_ticket(g_printer, g_unit_name, "DICH VU TEST", "A001", "---");
+        }
+    }
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     httpd_resp_set_hdr(req, "Connection", "close");
     httpd_resp_sendstr(req, "Test print sent to UART2 printer!");
+    return ESP_OK;
+}
+
+// ==================== TICKET TEMPLATE API ====================
+
+static esp_err_t api_ticket_template_get_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) { httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized"); return ESP_OK; }
+    static char tpl_buf[4096];
+    esp_err_t err = read_ticket_template(tpl_buf, sizeof(tpl_buf));
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    if (err == ESP_OK && strlen(tpl_buf) > 0) {
+        httpd_resp_sendstr(req, tpl_buf);
+    } else {
+        httpd_resp_sendstr(req, DEFAULT_TICKET_TEMPLATE);
+    }
+    return ESP_OK;
+}
+
+static esp_err_t api_ticket_template_post_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) { httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized"); return ESP_OK; }
+    int total = req->content_len;
+    if (total <= 0 || total > 4000) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large or empty (max 4000 bytes)");
+        return ESP_FAIL;
+    }
+    char* body = (char*)malloc(total + 1);
+    if (!body) { httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory"); return ESP_FAIL; }
+    int received = 0, ret;
+    while (received < total) {
+        ret = httpd_req_recv(req, body + received, total - received);
+        if (ret <= 0) { free(body); httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Recv failed"); return ESP_FAIL; }
+        received += ret;
+    }
+    body[received] = '\0';
+    // Validate JSON
+    cJSON *test = cJSON_Parse(body);
+    if (!test) {
+        free(body);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+    cJSON_Delete(test);
+    esp_err_t err = save_ticket_template(body);
+    free(body);
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    if (err == ESP_OK) {
+        add_device_log("Ticket template saved to NVS (%d bytes)", received);
+        httpd_resp_sendstr(req, "OK - Template saved");
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS write failed");
+    }
+    return ESP_OK;
+}
+
+static esp_err_t api_ticket_template_download_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) { httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Unauthorized"); return ESP_OK; }
+    static char tpl_buf[4096];
+    esp_err_t err = read_ticket_template(tpl_buf, sizeof(tpl_buf));
+    const char* content = (err == ESP_OK && strlen(tpl_buf) > 0) ? tpl_buf : DEFAULT_TICKET_TEMPLATE;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"ticket_template.json\"");
+    httpd_resp_sendstr(req, content);
+    return ESP_OK;
+}
+
+static esp_err_t ticket_config_get_handler(httpd_req_t *req)
+{
+    if (!is_authorized(req)) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/login?next=/ticket-config");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
+    extern const char* html_ticket_config;
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_sendstr(req, html_ticket_config);
     return ESP_OK;
 }
 
@@ -1151,8 +1272,24 @@ void print_ticket_by_service_id(int service_id, const char* customer_name = "Nú
     char ticket_num[16];
     snprintf(ticket_num, sizeof(ticket_num), "%03d", s_local_ticket_counter[sid_idx]);
     
-    add_device_log(">>> IN PHIẾU NÚT BẤM (Service ID: %d): Số %s - %s", service_id, ticket_num, service_name);
-    print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, "---");
+    add_device_log(">>> IN PHIEU NUT BAM (Service ID: %d): So %s - %s", service_id, ticket_num, service_name);
+    // Smart print: use JSON template from NVS if available
+    {
+        static char tpl_buf[4096];
+        esp_err_t tpl_err = read_ticket_template(tpl_buf, sizeof(tpl_buf));
+        if (tpl_err == ESP_OK && strlen(tpl_buf) > 0) {
+            cJSON *jtpl = cJSON_Parse(tpl_buf);
+            if (jtpl) {
+                cJSON *rows = cJSON_GetObjectItem(jtpl, "rows");
+                print_qms_ticket_from_json(g_printer, rows, g_unit_name, service_name, ticket_num, "---", "", "");
+                cJSON_Delete(jtpl);
+            } else {
+                print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, "---");
+            }
+        } else {
+            print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, "---");
+        }
+    }
 }
 
 // ==================== BUTTON TASK ====================
@@ -1446,6 +1583,39 @@ static httpd_handle_t start_webserver(void)
             .user_ctx  = NULL
         };
         httpd_register_uri_handler(server, &ota_get);
+
+        // ===== TICKET TEMPLATE CONFIG ROUTES =====
+        httpd_uri_t ticket_config_get = {
+            .uri       = "/ticket-config",
+            .method    = HTTP_GET,
+            .handler   = ticket_config_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &ticket_config_get);
+
+        httpd_uri_t api_tpl_get = {
+            .uri       = "/api/ticket-template",
+            .method    = HTTP_GET,
+            .handler   = api_ticket_template_get_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_tpl_get);
+
+        httpd_uri_t api_tpl_post = {
+            .uri       = "/api/ticket-template",
+            .method    = HTTP_POST,
+            .handler   = api_ticket_template_post_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_tpl_post);
+
+        httpd_uri_t api_tpl_download = {
+            .uri       = "/api/ticket-template/download",
+            .method    = HTTP_GET,
+            .handler   = api_ticket_template_download_handler,
+            .user_ctx  = NULL
+        };
+        httpd_register_uri_handler(server, &api_tpl_download);
 
         return server;
     }

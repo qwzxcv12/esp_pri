@@ -2,6 +2,7 @@
 #define RECEIPT_TEMPLATE_H
 
 #include "thermal_printer.h"
+#include "cJSON.h"
 #include <time.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -237,5 +238,118 @@ inline void print_startup_test_ticket(ThermalPrinter &printer, const char* dev_i
     printer.println("\n\n");
     printer.cut();
 }
+
+// ==================== JSON TEMPLATE PRINT ENGINE ====================
+
+// Thay thế biến {key} trong chuỗi content bằng giá trị thực
+inline std::string substitute_vars(const char* content,
+                                   const char* unit_name,
+                                   const char* service_name,
+                                   const char* ticket_number,
+                                   const char* calling_ticket,
+                                   const char* time_str,
+                                   const char* date_str) {
+    if (!content) return "";
+    std::string result = content;
+    
+    auto replace_all = [&](const std::string& from, const char* to) {
+        if (!to) return;
+        size_t pos = 0;
+        while ((pos = result.find(from, pos)) != std::string::npos) {
+            result.replace(pos, from.length(), to);
+            pos += strlen(to);
+        }
+    };
+    
+    replace_all("{unit_name}",      unit_name      ? unit_name      : "");
+    replace_all("{service_name}",   service_name   ? service_name   : "");
+    replace_all("{ticket_number}",  ticket_number  ? ticket_number  : "");
+    replace_all("{calling_ticket}", calling_ticket ? calling_ticket : "---");
+    replace_all("{time}",           time_str       ? time_str       : "");
+    replace_all("{date}",           date_str       ? date_str       : "");
+    
+    return result;
+}
+
+// In phiếu theo JSON template – rows[] array từ NVS
+inline void print_qms_ticket_from_json(ThermalPrinter &printer,
+                                       cJSON* rows,
+                                       const char* unit_name,
+                                       const char* service_name,
+                                       const char* ticket_number,
+                                       const char* calling_ticket,
+                                       const char* time_str,
+                                       const char* date_str) {
+    if (!rows || !cJSON_IsArray(rows)) return;
+
+    // Clean unit/service name of accents first
+    std::string cleanUnit    = remove_vietnamese_accents(unit_name    ? unit_name    : "HE THONG XEP HANG");
+    std::string cleanService = remove_vietnamese_accents(service_name ? service_name : "DICH VU");
+
+    int row_count = cJSON_GetArraySize(rows);
+    for (int i = 0; i < row_count; i++) {
+        cJSON *row = cJSON_GetArrayItem(rows, i);
+        if (!row) continue;
+
+        cJSON *jtype    = cJSON_GetObjectItem(row, "type");
+        cJSON *jcontent = cJSON_GetObjectItem(row, "content");
+        cJSON *jalign   = cJSON_GetObjectItem(row, "align");
+        cJSON *jsize    = cJSON_GetObjectItem(row, "size");
+        cJSON *jbold    = cJSON_GetObjectItem(row, "bold");
+        cJSON *jspacing = cJSON_GetObjectItem(row, "line_spacing");
+
+        const char* type_str = (jtype && jtype->valuestring) ? jtype->valuestring : "text";
+        int size = (jsize && cJSON_IsNumber(jsize)) ? jsize->valueint : 1;
+        bool bold = (jbold && cJSON_IsBool(jbold)) ? cJSON_IsTrue(jbold) : false;
+        int spacing = (jspacing && cJSON_IsNumber(jspacing)) ? jspacing->valueint : 40;
+
+        printer.resetSettings();
+
+        // Alignment
+        if (jalign && jalign->valuestring) {
+            if (strcmp(jalign->valuestring, "left")  == 0) printer.setAlignment(ThermalPrinter::LEFT);
+            else if (strcmp(jalign->valuestring, "right") == 0) printer.setAlignment(ThermalPrinter::RIGHT);
+            else printer.setAlignment(ThermalPrinter::CENTER);
+        } else {
+            printer.setAlignment(ThermalPrinter::CENTER);
+        }
+
+        printer.setSize(size);
+        printer.setBold(bold);
+        printer.setLineSpacing((uint8_t)spacing);
+
+        if (strcmp(type_str, "divider") == 0) {
+            printer.println("------------------------------------------");
+        } else {
+            // text / label: substitute vars then strip accents
+            const char* raw = (jcontent && jcontent->valuestring) ? jcontent->valuestring : "";
+            std::string substituted = substitute_vars(raw,
+                cleanUnit.c_str(), cleanService.c_str(),
+                ticket_number, calling_ticket, time_str, date_str);
+            std::string cleaned = remove_vietnamese_accents(substituted.c_str());
+            printer.println(cleaned.c_str());
+        }
+    }
+
+    printer.resetSettings();
+    printer.println("\n\n");
+    printer.cut();
+}
+
+// Default JSON template (used when NVS has no custom template)
+static const char* DEFAULT_TICKET_TEMPLATE = R"json({
+"version":1,"paper_width":80,"rows":[
+{"type":"text","content":"{unit_name}","align":"center","size":2,"bold":true,"line_spacing":50},
+{"type":"text","content":"{service_name}","align":"center","size":2,"bold":true,"line_spacing":45},
+{"type":"divider","line_spacing":30},
+{"type":"text","content":"SO THU TU","align":"center","size":2,"bold":true,"line_spacing":45},
+{"type":"text","content":"{ticket_number}","align":"center","size":4,"bold":true,"line_spacing":80},
+{"type":"divider","line_spacing":30},
+{"type":"text","content":"STT dang goi: {calling_ticket}","align":"center","size":2,"bold":true,"line_spacing":45},
+{"type":"divider","line_spacing":30},
+{"type":"text","content":"QUY KHACH vui long cho duoc phuc vu theo","align":"center","size":1,"bold":false,"line_spacing":45},
+{"type":"text","content":"STT hien tren bang dien tu. Xin cam on!","align":"center","size":1,"bold":false,"line_spacing":45},
+{"type":"text","content":"STT duoc in luc: {time} ngay {date}","align":"center","size":1,"bold":false,"line_spacing":40}
+]})json";
 
 #endif
