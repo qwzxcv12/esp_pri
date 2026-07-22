@@ -1477,7 +1477,10 @@ extern "C" void app_main(void)
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
 
-        add_device_log("AP Mode started. SSID: %s", ap_ssid);
+        // Limit TX Power to 15dBm (60 * 0.25dBm) like Tasmota to prevent USB power drop resets
+        esp_wifi_set_max_tx_power(60);
+
+        add_device_log("AP Mode started. SSID: %s (TX Power: 15dBm, Channel: 1)", ap_ssid);
         add_device_log("Connect to AP - Captive Portal active at http://192.168.4.1");
 
         start_webserver();
