@@ -360,8 +360,8 @@ static bool is_authorized(httpd_req_t *req)
     return authorized;
 }
 
-// Helper: send large data in small 1KB chunks to prevent timeout on slow AP WiFi
-#define CHUNK_SEND_SIZE 1024
+// Helper: send large data in 4KB chunks for high performance web serving
+#define CHUNK_SEND_SIZE 4096
 static esp_err_t send_large_chunk(httpd_req_t *req, const char* data, size_t len) {
     size_t sent = 0;
     while (sent < len) {
@@ -1278,10 +1278,11 @@ static httpd_handle_t start_webserver(void)
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 32;
-    config.stack_size = 16384; // Increase stack size to prevent stack overflow
+    config.max_open_sockets = 7; // Support up to 7 concurrent browser connections
+    config.stack_size = 16384;
     config.lru_purge_enable = true;
-    config.send_wait_timeout = 30; // 30 seconds timeout for slow AP WiFi
-    config.recv_wait_timeout = 30; // 30 seconds receive timeout
+    config.send_wait_timeout = 5; // 5 seconds timeout to release sockets fast
+    config.recv_wait_timeout = 5; // 5 seconds receive timeout
 
     ESP_LOGI(TAG, "Starting web server on port: %d", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
