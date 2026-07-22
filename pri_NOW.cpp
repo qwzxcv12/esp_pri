@@ -588,7 +588,9 @@ static esp_err_t config_post_handler(httpd_req_t *req)
             }
         }
 
-        char response_html[1536];
+        char response_html[2048];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
         if (strlen(got_ip_str) > 0) {
             snprintf(response_html, sizeof(response_html),
                 "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
@@ -627,6 +629,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
                 "</div></body></html>",
                 ssid);
         }
+#pragma GCC diagnostic pop
 
         httpd_resp_set_hdr(req, "Connection", "close");
         httpd_resp_sendstr(req, response_html);
