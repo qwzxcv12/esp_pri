@@ -50,6 +50,7 @@ static std::string g_scan_result_json = "[]";
 static std::mutex  g_scan_mutex;
 static volatile bool g_scan_in_progress = false;
 static int wifi_rssi_to_quality(int rssi); // forward declare
+static int g_ap_config_counter = 180;      // forward declare (used by wifi_connect_switch_task)
 
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -1079,7 +1080,6 @@ static esp_err_t api_scan_wifi_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static int g_ap_config_counter = 180;
 
 inline void reset_wifi_config_counter(void) {
     g_ap_config_counter = 180;

@@ -161,6 +161,7 @@ if (-not $runId) {
 }
 
 $completed = $false
+$buildSuccess = $false
 for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 10
     try {
@@ -169,10 +170,7 @@ for ($i = 0; $i -lt 60; $i++) {
         Write-Host "Build status: $($run.status), Conclusion: $(if ($run.conclusion) { $run.conclusion } else { 'Running...' })" -ForegroundColor Yellow
         if ($run.status -eq "completed") {
             $completed = $true
-            if ($run.conclusion -ne "success") {
-                Write-Error "Build failed on GitHub Actions with conclusion: $($run.conclusion)"
-                exit 1
-            }
+            $buildSuccess = ($run.conclusion -eq "success")
             break
         }
     } catch {
@@ -182,6 +180,27 @@ for ($i = 0; $i -lt 60; $i++) {
 
 if (-not $completed) {
     Write-Error "Build timed out on GitHub Actions."
+    exit 1
+}
+
+if (-not $buildSuccess) {
+    Write-Host "`n[ERROR] Build FAILED on GitHub Actions. Fetching error log..." -ForegroundColor Red
+    try {
+        $jobsApi = "https://api.github.com/repos/$repoPath/actions/runs/$runId/jobs"
+        $jobsData = Invoke-RestMethod -Uri $jobsApi -Headers $headers -Method Get
+        $jobId = $jobsData.jobs[0].id
+        $logPath = "build_error.log"
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("Authorization", "Bearer $githubToken")
+        $wc.Headers.Add("User-Agent", "ESP32-Builder")
+        $wc.DownloadFile("https://api.github.com/repos/$repoPath/actions/jobs/$jobId/logs", $logPath)
+        Write-Host "Build log saved to: $logPath" -ForegroundColor Yellow
+        Write-Host "`n--- BUILD ERRORS ---" -ForegroundColor Red
+        Select-String -Path $logPath -Pattern "error:" -Context 1,1 | ForEach-Object { Write-Host $_.ToString() -ForegroundColor Red }
+        Write-Host "--- END ---`n" -ForegroundColor Red
+    } catch {
+        Write-Host "Could not fetch build log: $_" -ForegroundColor Gray
+    }
     exit 1
 }
 

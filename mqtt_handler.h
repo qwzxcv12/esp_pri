@@ -201,6 +201,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                                 const char *service = cJSON_GetStringValue(cJSON_GetObjectItem(data, "service"));
                                 const char *color = cJSON_GetStringValue(cJSON_GetObjectItem(data, "color"));
                                 const char *cust_name = cJSON_GetStringValue(cJSON_GetObjectItem(data, "cust_name"));
+                                (void)color; // reserved for future use
                                 processed = true;
                                 if (cust_name) {
                                     add_device_log(">>> CALLING: Ticket=%s, Counter=%s, Service=%s, Customer=%s", 
