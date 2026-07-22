@@ -1125,6 +1125,28 @@ static void ap_timeout_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+static int s_local_ticket_counter[100] = {0};
+
+void print_ticket_by_service_id(int service_id, const char* customer_name = "Nút Bấm Trực Tiếp") {
+    const char* service_name = "Dịch Vụ";
+    for (int j = 0; j < g_service_count; j++) {
+        if (g_services[j].id == service_id) {
+            service_name = g_services[j].name;
+            break;
+        }
+    }
+    
+    int sid_idx = service_id % 100;
+    s_local_ticket_counter[sid_idx]++;
+    if (s_local_ticket_counter[sid_idx] > 999) s_local_ticket_counter[sid_idx] = 1;
+    
+    char ticket_num[16];
+    snprintf(ticket_num, sizeof(ticket_num), "%03d", s_local_ticket_counter[sid_idx]);
+    
+    add_device_log(">>> IN PHIẾU NÚT BẤM (Service ID: %d): Số %s - %s", service_id, ticket_num, service_name);
+    print_qms_ticket(g_printer, g_unit_name, service_name, ticket_num, customer_name);
+}
+
 // ==================== BUTTON TASK ====================
 static void button_task(void *pvParameters) {
     // Parse saved JSON and configure pins
@@ -1165,6 +1187,20 @@ static void button_task(void *pvParameters) {
         }
     }
 
+    // Default GPIO Fallback if no NVS config exists
+    if (g_pin_mapping_count == 0) {
+        int default_pins[] = {4, 5, 6, 7};
+        for (int i = 0; i < 4; i++) {
+            g_pin_mappings[i].service_id = i + 1;
+            g_pin_mappings[i].pin = default_pins[i];
+            gpio_reset_pin((gpio_num_t)default_pins[i]);
+            gpio_set_direction((gpio_num_t)default_pins[i], GPIO_MODE_INPUT);
+            gpio_set_pull_mode((gpio_num_t)default_pins[i], GPIO_PULLUP_ONLY);
+        }
+        g_pin_mapping_count = 4;
+        add_device_log("Initialized default 4 button pins: GPIO 4, 5, 6, 7");
+    }
+
     // State tracking for debounce
     int last_state[MAX_PIN_MAPPINGS];
     for (int i=0; i<MAX_PIN_MAPPINGS; i++) last_state[i] = 1; // Pullup default High
@@ -1174,9 +1210,10 @@ static void button_task(void *pvParameters) {
             int current_state = gpio_get_level((gpio_num_t)g_pin_mappings[i].pin);
             if (current_state == 0 && last_state[i] == 1) {
                 // Button pressed (falling edge)
-                add_device_log("Button pressed on pin %d", g_pin_mappings[i].pin);
+                add_device_log("Nút bấm GPIO %d được nhấn (Service ID: %d)", g_pin_mappings[i].pin, g_pin_mappings[i].service_id);
                 send_ticket_request_by_service_id(g_pin_mappings[i].service_id);
-                vTaskDelay(pdMS_TO_TICKS(300)); // Debounce and block hold
+                print_ticket_by_service_id(g_pin_mappings[i].service_id, "Nút Bấm Trực Tiếp");
+                vTaskDelay(pdMS_TO_TICKS(500)); // Debounce and block hold
             }
             last_state[i] = current_state;
         }
