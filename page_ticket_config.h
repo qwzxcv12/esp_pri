@@ -352,8 +352,8 @@ const char* html_ticket_config = R"html(
         <div class="container">
             <!-- Subtab View Switcher -->
             <div class="subtabs">
-                <button class="subtab-btn active" id="tabEdit" onclick="switchTab('edit')">ðŸ“ JSON Editor</button>
-                <button class="subtab-btn" id="tabPreview" onclick="switchTab('preview')">ðŸ‘ Receipt Preview</button>
+                <button class="subtab-btn active" id="tabEdit" onclick="switchTab('edit')">[Edit] JSON Editor</button>
+                <button class="subtab-btn" id="tabPreview" onclick="switchTab('preview')">[Preview] Receipt Preview</button>
             </div>
 
             <!-- Status Notification Bar -->
@@ -385,13 +385,13 @@ const char* html_ticket_config = R"html(
             <button class="submit" onclick="saveTemplate()">SAVE CONFIGURATION</button>
 
             <div class="action-grid" style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-                <button class="btn" style="flex: 1;" onclick="testPrint()">ðŸ–¨ Test Print</button>
-                <button class="btn" style="flex: 1;" onclick="downloadTemplate()">ðŸ“¥ Download</button>
-                <label class="btn" style="flex: 1; text-align: center;" for="fileInput">ðŸ“¤ Upload</label>
+                <button class="btn" style="flex: 1;" onclick="testPrint()">Test Print</button>
+                <button class="btn" style="flex: 1;" onclick="downloadTemplate()">Download JSON</button>
+                <label class="btn" style="flex: 1; text-align: center;" for="fileInput">Upload File</label>
                 <input type="file" id="fileInput" accept=".json,application/json" onchange="loadFromFile(event)">
             </div>
 
-            <button class="btn btn--danger" style="width: 100%; margin-top: 10px;" onclick="resetDefault()">â™» Reset to Default</button>
+            <button class="btn btn--danger" style="width: 100%; margin-top: 10px;" onclick="resetDefault()">Reset to Default</button>
         </div>
     </div>
 
@@ -458,7 +458,7 @@ function loadTemplate(){
   xhr.send();
 }
 function saveTemplate(cb){
-  var t=parseEditor();if(!t){setStatus("Invalid JSON format â€“ please fix before saving","err");if(cb)cb(false);return}
+  var t=parseEditor();if(!t){setStatus("Invalid JSON format - please fix before saving","err");if(cb)cb(false);return}
   setStatus("Saving template to device...","info");
   var xhr=new XMLHttpRequest();xhr.open("POST","/api/ticket-template");
   xhr.setRequestHeader("Content-Type","application/json");
