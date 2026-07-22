@@ -243,9 +243,10 @@ const char* ota_page = R"=====(
 
         <div class="panel__nav">
             <a href="/" class="nav-item">Configuration</a>
-            <a href="/log" class="nav-item">System Logs</a>
             <a href="/gpio" class="nav-item">GPIO Mapping</a>
+            <a href="/ticket-config" class="nav-item">Ticket Template</a>
             <a href="/ota" class="nav-item active">Update</a>
+            <a href="/log" class="nav-item">System Logs</a>
         </div>
         <div class="container">
             <h3 style="margin-top:0">Firmware Update</h3>

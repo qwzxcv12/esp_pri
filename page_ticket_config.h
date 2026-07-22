@@ -1,4 +1,4 @@
-﻿#ifndef PAGE_TICKET_CONFIG_H
+#ifndef PAGE_TICKET_CONFIG_H
 #define PAGE_TICKET_CONFIG_H
 
 const char* html_ticket_config = R"html(
@@ -49,7 +49,7 @@ input[type=file]{display:none}
 <body>
 <header>
 <div><div class="logo">Cau Hinh Mau Phieu In</div><div class="subtitle">JSON Template Editor</div></div>
-<div class="nav-links"><a href="/">Cau hinh</a><a href="/log">Log</a><a href="/gpio">GPIO</a></div>
+<div class="nav-links"><a href="/">Configuration</a><a href="/gpio">GPIO Mapping</a><a href="/ticket-config" style="color:var(--accent);font-weight:bold">Ticket Template</a><a href="/ota">Update</a><a href="/log">System Logs</a></div>
 </header>
 <div class="toolbar">
 <button class="btn btn-primary" onclick="saveTemplate()">Luu len thiet bi</button>

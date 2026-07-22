@@ -302,9 +302,10 @@ const char* gpio_page = R"html(
 
         <div class="panel__nav">
             <a href="/" class="nav-item">Configuration</a>
-            <a href="/log" class="nav-item">System Logs</a>
             <a href="/gpio" class="nav-item active">GPIO Mapping</a>
+            <a href="/ticket-config" class="nav-item">Ticket Template</a>
             <a href="/ota" class="nav-item">Update</a>
+            <a href="/log" class="nav-item">System Logs</a>
         </div>
 
         <div class="container">
