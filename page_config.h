@@ -434,8 +434,14 @@ const char* html_page = R"html(
                     <span class="section__label">Network</span>
                 </div>
                 <div class="field">
-                    <label for="ssid">Wi-Fi network name (SSID)</label>
-                    <input type="text" id="ssid" name="ssid" required placeholder="Enter Wi-Fi SSID" value="{{SSID}}">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                        <label for="ssid" style="margin:0;">Wi-Fi network name (SSID)</label>
+                        <button type="button" onclick="scanWifiNetworks()" style="background:var(--panel); border:1px solid var(--accent); color:var(--accent); font-family:var(--mono); font-size:10px; padding:4px 10px; border-radius:4px; cursor:pointer;">
+                            &#x21bb; Scan Wi-Fi Networks
+                        </button>
+                    </div>
+                    <input type="text" id="ssid" name="ssid" required placeholder="Enter Wi-Fi SSID or select below" value="{{SSID}}">
+                    <div id="wifiScanList" style="display:none; margin-top:8px; background:rgba(0,0,0,0.5); border:1px solid var(--line); border-radius:5px; max-height:180px; overflow-y:auto; padding:4px;"></div>
                 </div>
                 <div class="field">
                     <label for="password">Wi-Fi password</label>
@@ -622,6 +628,54 @@ const char* html_page = R"html(
         });
 
         renderTopics();
+
+        function scanWifiNetworks() {
+            const listEl = document.getElementById('wifiScanList');
+            if (!listEl) return;
+            listEl.style.display = 'block';
+            listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:var(--accent); text-align:center;">Scanning 2.4GHz Wi-Fi networks...</div>';
+            
+            fetch('/api/scan-wifi')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || data.length === 0) {
+                        listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:var(--muted); text-align:center;">No Wi-Fi networks found. Try clicking Scan again.</div>';
+                        return;
+                    }
+                    listEl.innerHTML = '';
+                    data.sort((a,b) => b.quality - a.quality);
+                    data.forEach(item => {
+                        const row = document.createElement('div');
+                        row.className = 'dropdown-option';
+                        row.style.display = 'flex';
+                        row.style.justifyContent = 'space-between';
+                        row.style.alignItems = 'center';
+                        row.style.padding = '8px 10px';
+                        row.style.borderBottom = '1px solid var(--line)';
+                        row.style.cursor = 'pointer';
+                        row.onclick = () => {
+                            document.getElementById('ssid').value = item.ssid;
+                            document.getElementById('password').focus();
+                            listEl.style.display = 'none';
+                        };
+                        const lockIcon = item.auth !== 'OPEN' ? '&#128274;' : '&#128275;';
+                        row.innerHTML = `
+                            <span style="font-weight:bold; color:var(--text);">${item.ssid}</span>
+                            <span style="color:var(--muted); font-size:11px;">${lockIcon} ${item.quality}% (${item.rssi} dBm)</span>
+                        `;
+                        listEl.appendChild(row);
+                    });
+                })
+                .catch(err => {
+                    listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:#ff5555; text-align:center;">Failed to scan Wi-Fi networks.</div>';
+                });
+        }
+
+        // Auto-scan on load if SSID is empty
+        const ssidInput = document.getElementById('ssid');
+        if (ssidInput && (!ssidInput.value || ssidInput.value === '{{SSID}}')) {
+            setTimeout(scanWifiNetworks, 600);
+        }
 
         // 15-minute Inactivity Auto Logout
         (function() {
