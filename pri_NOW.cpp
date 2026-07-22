@@ -300,7 +300,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             s_startup_printed = true;
             char ssid[64] = {0}, pass[64] = {0};
             read_wifi_credentials(ssid, sizeof(ssid), pass, sizeof(pass));
-            print_startup_test_ticket(ip_str, ssid, g_mqtt_server_host, true);
+            print_startup_test_ticket(g_printer, g_dev_id, ip_str, ssid, g_mqtt_server_host, true);
         }
 
         // Auto-start MQTT client when IP is obtained if configured and not yet running
