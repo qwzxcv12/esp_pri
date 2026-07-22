@@ -598,13 +598,13 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
         esp_wifi_connect();
 
-        char response_html[512];
+        char response_html[768];
         snprintf(response_html, sizeof(response_html),
             "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
             "<title>WiFi Saved</title></head><body style=\"font-family:sans-serif;background:#0b0f14;color:#fff;text-align:center;padding-top:50px;\">"
-            "<h2 style=\"color:#5ec98f;\">Wi-Fi Credentials Saved!</h2>"
-            "<p>Connecting to <b>%s</b>... Nếu kết nối thành công, hotspot cấu hình sẽ tự tắt.</p>"
-            "<p style=\"color:#8b949e;font-size:13px;\">Nếu không thấy IP mới trong ~10s, hotspot <b>ESP32_WiFi_Config</b> vẫn còn để bạn thử lại.</p>"
+            "<h2 style=\"color:#5ec98f;\">Wi-Fi Saved!</h2>"
+            "<p>Connecting to <b>%s</b>...</p>"
+            "<p style=\"color:#8b949e;font-size:13px;\">AP will auto-disable on success. If no IP in ~10s, reconnect to ESP32_WiFi_Config.</p>"
             "</body></html>", ssid);
 
         httpd_resp_set_hdr(req, "Connection", "close");
