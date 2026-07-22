@@ -1166,7 +1166,7 @@ static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+    config.max_uri_handlers = 32;
     config.stack_size = 16384; // Increase stack size to prevent stack overflow
     config.lru_purge_enable = true;
     config.send_wait_timeout = 30; // 30 seconds timeout for slow AP WiFi
@@ -1483,8 +1483,8 @@ extern "C" void app_main(void)
         start_webserver();
 
         // Start Tasmota-style DNS Server & AP Timeout Tasks
-        xTaskCreate(dns_server_task, "dns_task", 3072, NULL, 5, NULL);
-        xTaskCreate(ap_timeout_task, "ap_timeout_task", 2048, NULL, 5, NULL);
+        xTaskCreate(dns_server_task, "dns_task", 4096, NULL, 5, NULL);
+        xTaskCreate(ap_timeout_task, "ap_timeout_task", 4096, NULL, 5, NULL);
     } else {
         add_device_log("Starting Web Server in Station mode...");
         start_webserver();
