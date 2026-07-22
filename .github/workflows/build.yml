@@ -17,11 +17,9 @@ jobs:
 
       - name: Reconstruct ESP-IDF Project Structure
         run: |
-          # Create ESP-IDF standard directories
           mkdir -p project/main
           mkdir -p project/components
 
-          # Copy main application files
           cp pri_NOW.cpp project/main/main.cpp
           cp *.h project/main/ || true
           cp idf_component.yml project/main/
@@ -29,10 +27,8 @@ jobs:
           cp sdkconfig.defaults project/
           cp partitions.csv project/ || true
 
-          # Create root CMakeLists.txt
-          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude($ENV{IDF_PATH}/tools/cmake/project.cmake)\nproject(pri_NOW)\n' > project/CMakeLists.txt
+          printf 'cmake_minimum_required(VERSION 3.16)\nadd_compile_definitions("esp_wifi_set_band_mode=(int)" "WIFI_BAND_MODE_2G_ONLY=0")\ninclude({IDF_PATH}/tools/cmake/project.cmake)\nproject(pri_NOW)\n' > project/CMakeLists.txt
 
-          # Arduino Core (ESP32-S3 compatible: release/v3.0.x)
           git clone --depth 1 -b release/v3.0.x https://github.com/espressif/arduino-esp32.git project/components/arduino
 
       - name: Build Firmware (ESP32-S3)

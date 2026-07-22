@@ -41,10 +41,15 @@ void init_thermal_printer() {
     uart_driver_install(UART_NUM_2, 256, 0, 0, NULL, 0);
     ESP_LOGI("PRINTER", "Thermal Printer UART initialized on TX=17, RX=18");
 }
+#include <mutex>
+
 static const char *TAG = "wifi_manager";
 static bool g_in_ap_mode = false;
 
-
+static std::string g_scan_result_json = "[]";
+static std::mutex  g_scan_mutex;
+static volatile bool g_scan_in_progress = false;
+static int wifi_rssi_to_quality(int rssi); // forward declare
 
 static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -237,9 +242,48 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             }
         } else {
             // Runtime phase: reconnect directly without blocking event loop
-            add_device_log("WiFi lost during runtime. Retrying connection...");
+            static int s_runtime_disconnect_count = 0;
+            s_runtime_disconnect_count++;
+            add_device_log("WiFi lost during runtime (%d retries). Retrying connection...", s_runtime_disconnect_count);
+            if (s_runtime_disconnect_count > 10 && !g_in_ap_mode) {
+                add_device_log("WiFi connection lost repeatedly. Re-enabling AP mode for reconfiguration...");
+                g_in_ap_mode = true;
+                esp_wifi_set_mode(WIFI_MODE_APSTA);
+                s_runtime_disconnect_count = 0;
+            }
             esp_wifi_connect();
         }
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        uint16_t number = 16;
+        wifi_ap_record_t ap_records[16];
+        esp_wifi_scan_get_ap_records(&number, ap_records);
+        add_device_log("WiFi Scan complete. Found %d networks.", number);
+
+        cJSON *root = cJSON_CreateArray();
+        for (int i = 0; i < number; i++) {
+            if (strlen((char*)ap_records[i].ssid) > 0) {
+                cJSON *item = cJSON_CreateObject();
+                cJSON_AddStringToObject(item, "ssid", (char*)ap_records[i].ssid);
+                cJSON_AddNumberToObject(item, "rssi", ap_records[i].rssi);
+                cJSON_AddNumberToObject(item, "quality", wifi_rssi_to_quality(ap_records[i].rssi));
+                const char* auth_str = "OPEN";
+                if (ap_records[i].authmode == WIFI_AUTH_WEP) auth_str = "WEP";
+                else if (ap_records[i].authmode == WIFI_AUTH_WPA_PSK) auth_str = "WPA";
+                else if (ap_records[i].authmode == WIFI_AUTH_WPA2_PSK) auth_str = "WPA2";
+                else if (ap_records[i].authmode == WIFI_AUTH_WPA_WPA2_PSK) auth_str = "WPA/WPA2";
+                else if (ap_records[i].authmode == WIFI_AUTH_WPA3_PSK) auth_str = "WPA3";
+                cJSON_AddStringToObject(item, "auth", auth_str);
+                cJSON_AddItemToArray(root, item);
+            }
+        }
+        char *json_str = cJSON_PrintUnformatted(root);
+        {
+            std::lock_guard<std::mutex> lock(g_scan_mutex);
+            g_scan_result_json = json_str ? json_str : "[]";
+        }
+        if (json_str) free(json_str);
+        cJSON_Delete(root);
+        g_scan_in_progress = false;
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         char ip_str[32];
@@ -382,110 +426,32 @@ static esp_err_t send_html_template_chunked(httpd_req_t *req, const char* templa
                                 const char* mqtt_user, const char* mqtt_pass,
                                 const char* mqtt_topic, const char* ws_url,
                                 const char* dev_id, const char* dev_key) {
-    const char* ptr = template_str;
-    const char* placeholder = nullptr;
-    
-    while ((placeholder = strstr(ptr, "{{")) != nullptr) {
-        size_t static_len = placeholder - ptr;
-        if (static_len > 0) {
-            if (send_large_chunk(req, ptr, static_len) != ESP_OK) {
-                return ESP_FAIL;
-            }
-        }
-        
-        const char* end = strstr(placeholder, "}}");
-        if (!end) {
-            send_large_chunk(req, placeholder, strlen(placeholder));
-            return ESP_OK;
-        }
-        
-        size_t key_len = end - (placeholder + 2);
-        std::string key(placeholder + 2, key_len);
-        
-        esp_err_t res = ESP_OK;
-        if (key == "SSID") {
-            if (strlen(ssid) > 0) res = httpd_resp_send_chunk(req, ssid, strlen(ssid));
-        } else if (key == "PASSWORD") {
-            if (strlen(password) > 0) res = httpd_resp_send_chunk(req, password, strlen(password));
-        } else if (key == "MQTT_SERVER") {
-            const char* val = strlen(mqtt_server) > 0 ? mqtt_server : "qms1.camdvr.org";
-            res = httpd_resp_send_chunk(req, val, strlen(val));
-        } else if (key == "MQTT_PORT") {
-            const char* val = strlen(mqtt_port) > 0 ? mqtt_port : "1993";
-            res = httpd_resp_send_chunk(req, val, strlen(val));
-        } else if (key == "MQTT_USER") {
-            const char* val = strlen(mqtt_user) > 0 ? mqtt_user : "thom";
-            res = httpd_resp_send_chunk(req, val, strlen(val));
-        } else if (key == "MQTT_PASS") {
-            const char* val = strlen(mqtt_pass) > 0 ? mqtt_pass : "301258";
-            res = httpd_resp_send_chunk(req, val, strlen(val));
-        } else if (key == "MQTT_TOPIC") {
-            const char* val = strlen(mqtt_topic) > 0 ? mqtt_topic : "qms/display";
-            res = httpd_resp_send_chunk(req, val, strlen(val));
-        } else if (key == "WS_URL") {
-            if (strlen(ws_url) > 0) res = httpd_resp_send_chunk(req, ws_url, strlen(ws_url));
-        } else if (key == "DEV_ID") {
-            if (strlen(dev_id) > 0) res = httpd_resp_send_chunk(req, dev_id, strlen(dev_id));
-        } else if (key == "DEV_KEY") {
-            if (strlen(dev_key) > 0) res = httpd_resp_send_chunk(req, dev_key, strlen(dev_key));
-        } else {
-            res = httpd_resp_send_chunk(req, placeholder, end + 2 - placeholder);
-        }
-        
-        if (res != ESP_OK) {
-            return ESP_FAIL;
-        }
-        
-        ptr = end + 2;
+    std::string html = template_str;
+    html = replace_placeholder(html, "{{SSID}}", strlen(ssid) > 0 ? ssid : "");
+    html = replace_placeholder(html, "{{PASSWORD}}", strlen(password) > 0 ? password : "");
+    html = replace_placeholder(html, "{{MQTT_SERVER}}", strlen(mqtt_server) > 0 ? mqtt_server : "qms1.camdvr.org");
+    html = replace_placeholder(html, "{{MQTT_PORT}}", strlen(mqtt_port) > 0 ? mqtt_port : "1993");
+    html = replace_placeholder(html, "{{MQTT_USER}}", strlen(mqtt_user) > 0 ? mqtt_user : "thom");
+    html = replace_placeholder(html, "{{MQTT_PASS}}", strlen(mqtt_pass) > 0 ? mqtt_pass : "301258");
+    html = replace_placeholder(html, "{{MQTT_TOPIC}}", strlen(mqtt_topic) > 0 ? mqtt_topic : "qms/display");
+    html = replace_placeholder(html, "{{WS_URL}}", strlen(ws_url) > 0 ? ws_url : "");
+    html = replace_placeholder(html, "{{DEV_ID}}", strlen(dev_id) > 0 ? dev_id : "");
+    html = replace_placeholder(html, "{{DEV_KEY}}", strlen(dev_key) > 0 ? dev_key : "");
+
+    if (send_large_chunk(req, html.c_str(), html.length()) != ESP_OK) {
+        return ESP_FAIL;
     }
-    
-    if (strlen(ptr) > 0) {
-        if (send_large_chunk(req, ptr, strlen(ptr)) != ESP_OK) {
-            return ESP_FAIL;
-        }
-    }
-    
     return httpd_resp_send_chunk(req, NULL, 0);
 }
 
 // Helper function to send Log template using chunked response
 static esp_err_t send_log_template_chunked(httpd_req_t *req, const char* template_str, const char* dev_id, const char* dev_key) {
-    const char* ptr = template_str;
-    const char* placeholder = nullptr;
-    
-    while ((placeholder = strstr(ptr, "{{")) != nullptr) {
-        size_t static_len = placeholder - ptr;
-        if (static_len > 0) {
-            if (send_large_chunk(req, ptr, static_len) != ESP_OK) {
-                return ESP_FAIL;
-            }
-        }
-        const char* end = strstr(placeholder, "}}");
-        if (!end) {
-            send_large_chunk(req, placeholder, strlen(placeholder));
-            return ESP_OK;
-        }
-        size_t key_len = end - (placeholder + 2);
-        std::string key(placeholder + 2, key_len);
-        
-        esp_err_t res = ESP_OK;
-        if (key == "DEV_ID") {
-            if (strlen(dev_id) > 0) res = httpd_resp_send_chunk(req, dev_id, strlen(dev_id));
-        } else if (key == "DEV_KEY") {
-            if (strlen(dev_key) > 0) res = httpd_resp_send_chunk(req, dev_key, strlen(dev_key));
-        } else {
-            res = httpd_resp_send_chunk(req, placeholder, end + 2 - placeholder);
-        }
-        
-        if (res != ESP_OK) {
-            return ESP_FAIL;
-        }
-        ptr = end + 2;
-    }
-    if (strlen(ptr) > 0) {
-        if (send_large_chunk(req, ptr, strlen(ptr)) != ESP_OK) {
-            return ESP_FAIL;
-        }
+    std::string html = template_str;
+    html = replace_placeholder(html, "{{DEV_ID}}", strlen(dev_id) > 0 ? dev_id : "");
+    html = replace_placeholder(html, "{{DEV_KEY}}", strlen(dev_key) > 0 ? dev_key : "");
+
+    if (send_large_chunk(req, html.c_str(), html.length()) != ESP_OK) {
+        return ESP_FAIL;
     }
     return httpd_resp_send_chunk(req, NULL, 0);
 }
@@ -520,6 +486,48 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
     return send_html_template_chunked(req, html_page, ssid, password, mqtt_server, mqtt_port, mqtt_user, mqtt_pass, mqtt_topic, ws_url, dev_id, dev_key);
+}
+
+static void wifi_connect_switch_task(void *pv) {
+    char *ssid = (char*)pv;
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t* netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    bool got_ip = false;
+    char got_ip_str[32] = {0};
+
+    for (int i = 0; i < 20; i++) { // tối đa 10 giây
+        vTaskDelay(pdMS_TO_TICKS(500));
+        if (netif_sta && esp_netif_get_ip_info(netif_sta, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+            snprintf(got_ip_str, sizeof(got_ip_str), IPSTR, IP2STR(&ip_info.ip));
+            got_ip = true;
+            break;
+        }
+    }
+
+    if (got_ip) {
+        add_device_log("Live connection successful! IP: %s. Switching off AP (no reboot)...", got_ip_str);
+        if (g_in_ap_mode) {
+            g_in_ap_mode = false;          // ap_timeout_task tự thoát ở lần check kế tiếp
+            g_ap_config_counter = 0;
+            esp_wifi_set_mode(WIFI_MODE_STA); // tắt AP, giữ nguyên phiên STA đang kết nối
+        }
+        // Khởi động MQTT nếu chưa chạy và đã có cấu hình broker
+        if (mqtt_client == NULL) {
+            char mqtt_server[64]={0}, mqtt_port[16]={0}, mqtt_user[64]={0}, mqtt_pass[64]={0}, mqtt_topic[256]={0};
+            read_mqtt_config(mqtt_server, sizeof(mqtt_server), mqtt_port, sizeof(mqtt_port),
+                              mqtt_user, sizeof(mqtt_user), mqtt_pass, sizeof(mqtt_pass),
+                              mqtt_topic, sizeof(mqtt_topic));
+            if (strlen(mqtt_server) > 0) {
+                int port = strlen(mqtt_port) > 0 ? atoi(mqtt_port) : 1883;
+                mqtt_app_start(mqtt_server, port, mqtt_user, mqtt_pass, mqtt_topic);
+            }
+        }
+    } else {
+        add_device_log("Failed to connect to WiFi SSID: %s. Keeping AP active for retry.", ssid);
+    }
+
+    free(ssid);
+    vTaskDelete(NULL);
 }
 
 void restart_task(void *pvParameters) {
@@ -573,7 +581,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         parse_url_param(buf, "ssid", ssid, sizeof(ssid));
         parse_url_param(buf, "password", password, sizeof(password));
         err = save_wifi_credentials(ssid, password);
-        add_device_log("Network configuration saved. Testing live connection to SSID: %s...", ssid);
+        add_device_log("Network configuration saved. Connecting in background to SSID: %s...", ssid);
         free(buf);
 
         if (err != ESP_OK) {
@@ -581,75 +589,28 @@ static esp_err_t config_post_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
 
-        // Test live connection in background
+        // Kết nối chạy nền — không block httpd, không cần reboot
         wifi_config_t wifi_config = {};
         strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
         strncpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-
         esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
         esp_wifi_connect();
 
-        // Poll for assigned IP for up to 6 seconds
-        char got_ip_str[32] = {0};
-        esp_netif_ip_info_t ip_info;
-        esp_netif_t* netif_sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-        
-        for (int i = 0; i < 12; i++) {
-            vTaskDelay(pdMS_TO_TICKS(500));
-            if (netif_sta && esp_netif_get_ip_info(netif_sta, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
-                snprintf(got_ip_str, sizeof(got_ip_str), IPSTR, IP2STR(&ip_info.ip));
-                add_device_log("Live connection successful! IP: %s", got_ip_str);
-                break;
-            }
-        }
-
-        char response_html[2048];
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-        if (strlen(got_ip_str) > 0) {
-            snprintf(response_html, sizeof(response_html),
-                "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                "<title>WiFi Connected</title><style>"
-                "body { font-family: system-ui, sans-serif; background: #0b0f14; color: #fff; text-align: center; padding: 40px 20px; }"
-                ".card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; max-width: 400px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }"
-                "h2 { color: #5ec98f; margin-top: 0; font-size: 22px; }"
-                ".ip-label { color: #8b949e; font-size: 13px; margin-top: 16px; text-transform: uppercase; letter-spacing: 1px; }"
-                ".ip-box { font-size: 24px; font-weight: bold; font-family: monospace; color: #ffb454; background: rgba(0,0,0,0.5); padding: 14px; border-radius: 8px; margin: 10px 0 20px; border: 1px solid #ffb454; }"
-                ".btn { display: inline-block; padding: 14px 28px; background: #5ec98f; color: #0b0f14; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 15px; }"
-                ".btn:hover { background: #73d9a1; }"
-                "</style>"
-                "<script>setTimeout(function() { window.location.href = 'http://%s/'; }, 6000);</script>"
-                "</head><body><div class=\"card\">"
-                "<h2>&#10004; Wi-Fi Connected!</h2>"
-                "<p style=\"color:#c9d1d9;\">Successfully connected to <strong>%s</strong></p>"
-                "<div class=\"ip-label\">Device IP Address</div>"
-                "<div class=\"ip-box\">%s</div>"
-                "<p style=\"color:#8b949e; font-size:12px; margin-bottom:20px;\">Redirecting to <a href=\"http://%s/\" style=\"color:#5ec98f;\">http://%s/</a> in 6 seconds...</p>"
-                "<a href=\"http://%s/\" class=\"btn\">Open Device Page Now</a>"
-                "</div></body></html>",
-                got_ip_str, ssid, got_ip_str, got_ip_str, got_ip_str, got_ip_str);
-        } else {
-            snprintf(response_html, sizeof(response_html),
-                "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-                "<title>WiFi Saved</title><style>"
-                "body { font-family: system-ui, sans-serif; background: #0b0f14; color: #fff; text-align: center; padding: 40px 20px; }"
-                ".card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; max-width: 400px; margin: 0 auto; }"
-                "h2 { color: #5ec98f; margin-top: 0; }"
-                ".btn { display: inline-block; margin-top: 16px; padding: 12px 24px; background: #5ec98f; color: #0b0f14; text-decoration: none; font-weight: bold; border-radius: 6px; }"
-                "</style></head><body><div class=\"card\">"
-                "<h2>Wi-Fi Credentials Saved!</h2>"
-                "<p>Connecting to <strong>%s</strong>...</p>"
-                "<p style=\"color:#8b949e; font-size:13px;\">ESP32 is rebooting. Please reconnect your phone to your home Wi-Fi network and check your router's DHCP list.</p>"
-                "<a href=\"/log\" class=\"btn\">System Logs</a>"
-                "</div></body></html>",
-                ssid);
-        }
-#pragma GCC diagnostic pop
+        char response_html[512];
+        snprintf(response_html, sizeof(response_html),
+            "<!DOCTYPE html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<title>WiFi Saved</title></head><body style=\"font-family:sans-serif;background:#0b0f14;color:#fff;text-align:center;padding-top:50px;\">"
+            "<h2 style=\"color:#5ec98f;\">Wi-Fi Credentials Saved!</h2>"
+            "<p>Connecting to <b>%s</b>... Nếu kết nối thành công, hotspot cấu hình sẽ tự tắt.</p>"
+            "<p style=\"color:#8b949e;font-size:13px;\">Nếu không thấy IP mới trong ~10s, hotspot <b>ESP32_WiFi_Config</b> vẫn còn để bạn thử lại.</p>"
+            "</body></html>", ssid);
 
         httpd_resp_set_hdr(req, "Connection", "close");
         httpd_resp_sendstr(req, response_html);
-        xTaskCreate(restart_task, "restart_task", 2048, NULL, 5, NULL);
+
+        char *ssid_copy = strdup(ssid);
+        xTaskCreate(wifi_connect_switch_task, "wifi_switch_task", 3072, ssid_copy, 5, NULL);
         return ESP_OK;
     } 
     else if (strcmp(config_section, "MQTT") == 0) {
@@ -1094,46 +1055,27 @@ static esp_err_t api_scan_wifi_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json; charset=utf-8");
     httpd_resp_set_hdr(req, "Connection", "close");
 
-    wifi_scan_config_t scan_config = {};
-    scan_config.show_hidden = false;
-    scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+    char query[16];
+    bool start_scan = (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) &&
+                       (strstr(query, "start=1") != NULL);
 
-    esp_err_t scan_err = esp_wifi_scan_start(&scan_config, true);
-    if (scan_err != ESP_OK) {
-        add_device_log("WiFi Scan failed: 0x%x (%s)", scan_err, esp_err_to_name(scan_err));
-        httpd_resp_sendstr(req, "[]");
-        return ESP_OK;
-    }
-
-    uint16_t number = 16;
-    wifi_ap_record_t ap_records[16];
-    esp_wifi_scan_get_ap_records(&number, ap_records);
-    add_device_log("WiFi Scan complete. Found %d networks.", number);
-
-    cJSON *root = cJSON_CreateArray();
-    for (int i = 0; i < number; i++) {
-        if (strlen((char*)ap_records[i].ssid) > 0) {
-            cJSON *item = cJSON_CreateObject();
-            cJSON_AddStringToObject(item, "ssid", (char*)ap_records[i].ssid);
-            cJSON_AddNumberToObject(item, "rssi", ap_records[i].rssi);
-            cJSON_AddNumberToObject(item, "quality", wifi_rssi_to_quality(ap_records[i].rssi));
-            
-            const char* auth_str = "OPEN";
-            if (ap_records[i].authmode == WIFI_AUTH_WEP) auth_str = "WEP";
-            else if (ap_records[i].authmode == WIFI_AUTH_WPA_PSK) auth_str = "WPA";
-            else if (ap_records[i].authmode == WIFI_AUTH_WPA2_PSK) auth_str = "WPA2";
-            else if (ap_records[i].authmode == WIFI_AUTH_WPA_WPA2_PSK) auth_str = "WPA/WPA2";
-            else if (ap_records[i].authmode == WIFI_AUTH_WPA3_PSK) auth_str = "WPA3";
-            cJSON_AddStringToObject(item, "auth", auth_str);
-
-            cJSON_AddItemToArray(root, item);
+    if (start_scan && !g_scan_in_progress) {
+        wifi_scan_config_t scan_config = {};
+        scan_config.show_hidden = false;
+        scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+        if (esp_wifi_scan_start(&scan_config, false) == ESP_OK) { // false = non-blocking
+            g_scan_in_progress = true;
         }
     }
 
-    char *json_str = cJSON_PrintUnformatted(root);
-    httpd_resp_send(req, json_str, strlen(json_str));
-    free(json_str);
-    cJSON_Delete(root);
+    std::string result;
+    {
+        std::lock_guard<std::mutex> lock(g_scan_mutex);
+        result = g_scan_result_json;
+    }
+    std::string payload = "{\"scanning\":" + std::string(g_scan_in_progress ? "true" : "false") +
+                           ",\"networks\":" + result + "}";
+    httpd_resp_send(req, payload.c_str(), payload.length());
     return ESP_OK;
 }
 

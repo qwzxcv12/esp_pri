@@ -633,49 +633,43 @@ const char* html_page = R"html(
             const listEl = document.getElementById('wifiScanList');
             if (!listEl) return;
             listEl.style.display = 'block';
-            listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:var(--accent); text-align:center;">Scanning 2.4GHz Wi-Fi networks...</div>';
-            
-            fetch('/api/scan-wifi')
-                .then(r => r.json())
-                .then(data => {
-                    if (!data || data.length === 0) {
-                        listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:var(--muted); text-align:center;">No Wi-Fi networks found. Try clicking Scan again.</div>';
-                        return;
-                    }
-                    listEl.innerHTML = '';
-                    data.sort((a,b) => b.quality - a.quality);
-                    data.forEach(item => {
-                        const row = document.createElement('div');
-                        row.className = 'dropdown-option';
-                        row.style.display = 'flex';
-                        row.style.justifyContent = 'space-between';
-                        row.style.alignItems = 'center';
-                        row.style.padding = '8px 10px';
-                        row.style.borderBottom = '1px solid var(--line)';
-                        row.style.cursor = 'pointer';
-                        row.onclick = () => {
-                            document.getElementById('ssid').value = item.ssid;
-                            document.getElementById('password').focus();
-                            listEl.style.display = 'none';
-                        };
-                        const lockIcon = item.auth !== 'OPEN' ? '&#128274;' : '&#128275;';
-                        row.innerHTML = `
-                            <span style="font-weight:bold; color:var(--text);">${item.ssid}</span>
-                            <span style="color:var(--muted); font-size:11px;">${lockIcon} ${item.quality}% (${item.rssi} dBm)</span>
-                        `;
-                        listEl.appendChild(row);
-                    });
-                })
-                .catch(err => {
-                    listEl.innerHTML = '<div style="padding:10px; font-family:var(--mono); font-size:11px; color:#ff5555; text-align:center;">Failed to scan Wi-Fi networks.</div>';
+            listEl.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--accent);text-align:center;">Scanning 2.4GHz Wi-Fi networks...</div>';
+
+            fetch('/api/scan-wifi?start=1').then(r => r.json()).then(poll).catch(err => {
+                listEl.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:#ff5555;text-align:center;">Failed to scan Wi-Fi networks.</div>';
+            });
+
+            function poll(data) {
+                if (data.scanning) {
+                    setTimeout(() => fetch('/api/scan-wifi').then(r => r.json()).then(poll).catch(err => {
+                        listEl.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:#ff5555;text-align:center;">Failed to scan Wi-Fi networks.</div>';
+                    }), 700);
+                    return;
+                }
+                const nets = data.networks || [];
+                if (nets.length === 0) {
+                    listEl.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">No Wi-Fi networks found. Try clicking Scan again.</div>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                nets.sort((a,b) => b.quality - a.quality);
+                nets.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'dropdown-option';
+                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;';
+                    row.onclick = () => {
+                        document.getElementById('ssid').value = item.ssid;
+                        document.getElementById('password').focus();
+                        listEl.style.display = 'none';
+                    };
+                    const lockIcon = item.auth !== 'OPEN' ? '&#128274;' : '&#128275;';
+                    row.innerHTML = `<span style="font-weight:bold;color:var(--text);">${item.ssid}</span>
+                        <span style="color:var(--muted);font-size:11px;">${lockIcon} ${item.quality}% (${item.rssi} dBm)</span>`;
+                    listEl.appendChild(row);
                 });
+            }
         }
 
-        // Auto-scan on load if SSID is empty
-        const ssidInput = document.getElementById('ssid');
-        if (ssidInput && (!ssidInput.value || ssidInput.value === '{{SSID}}')) {
-            setTimeout(scanWifiNetworks, 600);
-        }
 
         // 15-minute Inactivity Auto Logout
         (function() {
